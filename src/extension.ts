@@ -2,11 +2,18 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import * as jj from "./jj";
-import { Mono } from './mono';
+import { Mono } from "./mono";
+import { buildPrefixGraph } from "./graph";
 
 export function activate(context: vscode.ExtensionContext) {
   const monoTest = vscode.commands.registerCommand("jjq.monoTest", async () => {
-    const items = Object.values(Mono).map((c) => c.repeat(10) + "x");
+    const items = Object.values(Mono).map((c) => {
+      return {
+        label: c.repeat(10) + "x",
+        description: c.repeat(10) + "x",
+        detail: c.repeat(10) + "x",
+      };
+    });
     await vscode.window.showQuickPick(items, {
       placeHolder: "Select a change",
     });
@@ -89,7 +96,15 @@ export function activate(context: vscode.ExtensionContext) {
         };
       });
 
-      await vscode.window.showQuickPick(items, {
+      const detailedItems = [];
+      for (let i = 0; i + 1 < items.length; i += 2) {
+        detailedItems.push({
+          label: items[i].label,
+          description: items[i].description,
+          detail: items[i + 1].label,
+        });
+      }
+      await vscode.window.showQuickPick(detailedItems, {
         placeHolder: "Select a change",
       });
     }
@@ -97,19 +112,29 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(demoChangesQuickPick);
 
+  const x = vscode.window.createQuickPick();
+
   const changesQuickPick = vscode.commands.registerCommand(
     "jjq.changes",
     async () => {
-      const logs = await jj.log();
-      const items = logs.map((l: jj.Change) => {
-        const emptyNotice = l.isEmpty === "true" ? "(empty) " : "";
-        const changeMessage = l.changeMessage === "" ? "(no description set)" : l.changeMessage;
+      let ungraphedLogs = await jj.log();
+      const logs = buildPrefixGraph(ungraphedLogs);
+      const items = [];
+      for (const l of logs) {
+        const emptyNotice = l.isEmpty ? "(empty) " : "";
+        const changeMessage =
+          l.changeMessage === "" ? "(no description set)" : l.changeMessage;
         const description = emptyNotice + changeMessage;
-        return {
-          label: l.changeId,
+        const row = {
+          label: l.prefix + l.changeId,
           description: description,
         };
-      });
+        items.push(row);
+        items.push({
+          label: l.lineBelow,
+          description: "",
+        });
+      }
 
       const selection = await vscode.window.showQuickPick(items, {
         placeHolder: "Select a change",

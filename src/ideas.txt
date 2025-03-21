@@ -1,0 +1,5 @@
+look at what whichKey has done - https://github.com/VSpaceCode/vscode-which-key/blob/master/src/menu/baseWhichKeyMenu.ts#L36
+
+override text input to not filter anything, and just move the highlighted line?
+ 
+
