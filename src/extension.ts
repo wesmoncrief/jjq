@@ -97,47 +97,55 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(demoChangesQuickPick);
 
-  const changesQuickPick = vscode.commands.registerCommand("jjq.changes", async () => {
-    const logs = await jj.log();
-    const items = logs.map((l: jj.Change) => ({
-      label: l.changeId,
-      description: l.description,
-    }));
+  const changesQuickPick = vscode.commands.registerCommand(
+    "jjq.changes",
+    async () => {
+      const logs = await jj.log();
+      const items = logs.map((l: jj.Change) => {
+        const emptyNotice = l.isEmpty === "true" ? "(empty) " : "";
+        const changeMessage = l.changeMessage === "" ? "(no description set)" : l.changeMessage;
+        const description = emptyNotice + changeMessage;
+        return {
+          label: l.changeId,
+          description: description,
+        };
+      });
 
-    const selection = await vscode.window.showQuickPick(items, {
-      placeHolder: "Select a change",
-    });
+      const selection = await vscode.window.showQuickPick(items, {
+        placeHolder: "Select a change",
+      });
 
-    if (selection) {
-      vscode.window.showInformationMessage(
-        `You selected: ${JSON.stringify(selection)}`
-      );
+      if (selection) {
+        vscode.window.showInformationMessage(
+          `You selected: ${JSON.stringify(selection)}`
+        );
 
-      const actions = ["edit", "new", "abandon", "diff"];
-      const action = await vscode.window.showQuickPick(actions);
-      switch (action) {
-        case "edit":
-          await jj.edit(selection.label);
-          break;
-        case "diff":
-          // vscode.commands.executeCommand("vscode.diff", uri1, uri2)
-          throw new Error("nyi");
-          break;
-        case "new":
-          await jj.newChange(selection.label);
-          break;
-        case "abandon":
-          await jj.abandon(selection.label);
-          break;
-        case "squash":
-          await jj.squash(selection.label);
-          break;
-        case "show":
-          // opens code window with extra details
-          throw new Error('nyi');
+        const actions = ["edit", "new", "abandon", "diff"];
+        const action = await vscode.window.showQuickPick(actions);
+        switch (action) {
+          case "edit":
+            await jj.edit(selection.label);
+            break;
+          case "diff":
+            // vscode.commands.executeCommand("vscode.diff", uri1, uri2)
+            throw new Error("nyi");
+            break;
+          case "new":
+            await jj.newChange(selection.label);
+            break;
+          case "abandon":
+            await jj.abandon(selection.label);
+            break;
+          case "squash":
+            await jj.squash(selection.label);
+            break;
+          case "show":
+            // opens code window with extra details
+            throw new Error("nyi");
+        }
       }
     }
-  });
+  );
 
   context.subscriptions.push(changesQuickPick);
 }

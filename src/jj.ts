@@ -4,25 +4,39 @@ import { promisify } from "util";
 
 export interface Change {
   changeId: string;
-  description: string;
-  // some thinngs to add: isconflicted, diverges from remote, bookmarks on it, git SHA
+  changeMessage: string;
+  isEmpty: 'true' | 'false';
+  // some things to add: isconflicted, diverges from remote, bookmarks on it, git SHA
 }
+
+const changeTemplate = {
+  changeId: "change_id.shortest()",
+  changeMessage: "description",
+  isEmpty: "empty",
+};
 
 // todo
 const cwd = "/Users/wes/dev/jj-demo-repo";
 
 export async function log(): Promise<Change[]> {
   const separator = "jjqseparator";
-  const template = `"change_id.shortest() ++ '${separator}' ++ description"`;
+  const endEntry = "jjqend";
+  const template = `'${Object.values(changeTemplate).join(
+    `++ "${separator}" ++`
+  )} ++ "${endEntry}"'`;
   const { stdout } = await execArgs(["log", "-T", template, "--no-graph"], cwd);
 
-  const strSplit = stdout.split("\n");
+  const strSplit = stdout.split(endEntry);
+  strSplit.pop(); // last item is empty string
   const logs: Change[] = strSplit.map((l) => {
     const spl = l.split(separator);
-    return {
-      changeId: spl[0],
-      description: spl[1],
-    };
+    const change = {} as any;
+    let i = 0;
+    for (const key of Object.keys(changeTemplate)) {
+      change[key] = spl[i].trimEnd();
+      i += 1;
+    }
+    return change;
   });
   return logs;
 }
@@ -48,4 +62,3 @@ const execArgs = (args: string[], cwd: string) => {
   const cmd = args.join(" ");
   return exec("jj " + cmd, { cwd });
 };
-
