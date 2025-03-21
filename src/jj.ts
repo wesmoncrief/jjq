@@ -1,23 +1,38 @@
 import ChildProcess from "child_process";
-// import spawn from "cross-spawn";
 import { promisify } from "util";
 
 export interface Change {
   changeId: string;
   changeMessage: string;
-  isEmpty: 'true' | 'false';
+  isEmpty: boolean;
+  parents: string[]; // shortest changeId
+}
+
+export interface RawChange {
+  changeId: string;
+  changeMessage: string;
+  isEmpty: string;
+  parents: string; // shortest changeId
   // some things to add: isconflicted, diverges from remote, bookmarks on it, git SHA
 }
 
+const parentSeparator = "__";
 const changeTemplate = {
   changeId: "change_id.shortest()",
   changeMessage: "description",
   isEmpty: "empty",
+  parents: `parents.map(|c| c.change_id().shortest()).join("${parentSeparator}")`,
 };
 
 // todo
 const cwd = "/Users/wes/dev/jj-demo-repo";
 
+/*
+the defuault log template is 'present(@) | ancestors(immutable_heads().., 2) | present(trunk())
+
+log search language spec: jj help -k revsets
+
+*/
 export async function log(): Promise<Change[]> {
   const separator = "jjqseparator";
   const endEntry = "jjqend";
@@ -28,7 +43,7 @@ export async function log(): Promise<Change[]> {
 
   const strSplit = stdout.split(endEntry);
   strSplit.pop(); // last item is empty string
-  const logs: Change[] = strSplit.map((l) => {
+  const rawChanges: RawChange[] = strSplit.map((l) => {
     const spl = l.split(separator);
     const change = {} as any;
     let i = 0;
@@ -38,7 +53,15 @@ export async function log(): Promise<Change[]> {
     }
     return change;
   });
-  return logs;
+  const changes = rawChanges.map((c) => {
+    return {
+      changeId: c.changeId,
+      changeMessage: c.changeMessage,
+      isEmpty: c.isEmpty === "true",
+      parents: c.parents.split(parentSeparator),
+    };
+  });
+  return changes;
 }
 
 export async function edit(r: string): Promise<void> {
