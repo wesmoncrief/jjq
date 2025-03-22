@@ -1,0 +1,76 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`graph tests case 1`] = `
+[
+  {
+    "changeId": "l",
+    "changeMessage": "o",
+    "isEmpty": false,
+    "lineBelow": "┃",
+    "prefix": "●                ",
+  },
+  {
+    "changeId": "o",
+    "changeMessage": "A b",
+    "isEmpty": false,
+    "lineBelow": "┃",
+    "prefix": "●                ",
+  },
+  {
+    "changeId": "ut",
+    "changeMessage": "",
+    "isEmpty": true,
+    "lineBelow": "┃               ┃",
+    "prefix": "┃               ●                ",
+  },
+  {
+    "changeId": "s",
+    "changeMessage": "merged",
+    "isEmpty": false,
+    "lineBelow": "┃               ▓               ┐",
+    "prefix": "┃               ●                ",
+  },
+  {
+    "changeId": "w",
+    "changeMessage": "mergedemo",
+    "isEmpty": false,
+    "lineBelow": "▓               ┘               ┃",
+    "prefix": "┃               ●                ┃               ",
+  },
+  {
+    "changeId": "p",
+    "changeMessage": "A a a",
+    "isEmpty": false,
+    "lineBelow": "┃               ┃               ▓               ┘",
+    "prefix": "┃               ┃               ┃               ●                ",
+  },
+  {
+    "changeId": "uw",
+    "changeMessage": "A a b",
+    "isEmpty": false,
+    "lineBelow": "┃               ┃               ┃               ▓               ┘",
+    "prefix": "┃               ┃               ┃               ┃               ●                ",
+  },
+  {
+    "changeId": "k",
+    "changeMessage": "A a",
+    "isEmpty": false,
+    "lineBelow": "┃               ▓               ┘               ┃               ┃",
+    "prefix": "┃               ┃               ●                ┃               ┃               ",
+  },
+  {
+    "changeId": "t",
+    "changeMessage": "A",
+    "isEmpty": false,
+    "lineBelow": "┃               ┃               ┃               ┃               ┃",
+    "prefix": "●                ┃               ┃               ┃               ┃               ",
+  },
+  {
+    "changeId": "z",
+    "changeMessage": "",
+    "isEmpty": true,
+    "lineBelow": "┃               ┃               ┃               ┃               ┃",
+    "prefix": "●                ┃               ┃               ┃               ┃               ",
+  },
+]
+`;

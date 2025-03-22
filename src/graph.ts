@@ -27,7 +27,7 @@ export function buildPrefixGraph(changes: Change[]): ChangeWithPrefix[] {
     }
     const prefix = prefixArray.join("");
     if (change.parents.length > 2) {
-      throw new Error("nyi");
+      throw new Error("nyi - more than 2 parents");
     }
     const nextLanes = lanes.map((l) => l);
     nextLanes[laneIx] = "empty column (no collapsing yet)";
@@ -92,7 +92,6 @@ enum Connectors {
   // e.g. ─╯
   enterThenLeft = 4,
   enterThenRight = 5,
-  // left
   leftThenExit = 6,
   rightThenExit = 7,
 }

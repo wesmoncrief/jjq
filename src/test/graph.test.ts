@@ -1,7 +1,8 @@
 import { buildPrefixGraph } from "../graph";
+import { jestExpect as expect } from "mocha-expect-snapshot";
 
-suite("graph tests", () => {
-  test("case", () => {
+describe("graph tests", () => {
+  it("case", () => {
     const changes = [
       {
         changeId: "l",
@@ -66,5 +67,6 @@ suite("graph tests", () => {
     ];
     const prefixes = buildPrefixGraph(changes);
     console.log(prefixes);
+    expect(prefixes).toMatchSnapshot();
   });
 });
