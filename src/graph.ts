@@ -1,6 +1,7 @@
 import { Change } from "./jj";
 import { Mono } from "./mono";
 
+const EMPTY_LANE_IDENTIFIER = "empty_lane";
 // Generates a prefix
 // todo: elisions (between long parent & child chain), collapse lanes
 export function buildPrefixGraph(changes: Change[]): ChangeWithPrefix[] {
@@ -19,9 +20,10 @@ export function buildPrefixGraph(changes: Change[]): ChangeWithPrefix[] {
     const prefixArray = [];
     for (let i = 0; i < lanes.length; ++i) {
       if (i === laneIx) {
-        prefixArray.push(Mono.dot);
+        prefixArray.push(Mono.hollowDot);
       } else {
-        prefixArray.push(Mono.vertical);
+        const sym = lanes[i]== EMPTY_LANE_IDENTIFIER ? Mono.w : Mono.vertical;
+        prefixArray.push(sym);
       }
       prefixArray.push(Mono.w);
     }
@@ -30,7 +32,7 @@ export function buildPrefixGraph(changes: Change[]): ChangeWithPrefix[] {
       throw new Error("nyi - more than 2 parents");
     }
     const nextLanes = lanes.map((l) => l);
-    nextLanes[laneIx] = "empty column (no collapsing yet)";
+    nextLanes[laneIx] = EMPTY_LANE_IDENTIFIER;
     let insertTracker = 0;
     const insertLocations = [laneIx, lanes.length];
     function addNewParentLane(parentId: string) {
@@ -44,18 +46,27 @@ export function buildPrefixGraph(changes: Change[]): ChangeWithPrefix[] {
         addNewParentLane(parent);
       }
     }
+    while (nextLanes[nextLanes.length - 1] === EMPTY_LANE_IDENTIFIER) {
+      nextLanes.pop();
+    }
     const drawingInput: number[][] = [];
     for (let i = 0; i < lanes.length; ++i) {
-      const isDirectlyThere = nextLanes.includes(lanes[i]);
+      if (lanes[i] === EMPTY_LANE_IDENTIFIER) {
+        drawingInput.push([]);
+        continue;
+      }
+      const isDirectlyThere = nextLanes.includes(lanes[i]) && lanes[i];
       if (isDirectlyThere) {
         drawingInput.push([i]);
       } else {
-        const parents = graph.get(lanes[i])?.parents!;
-        const parentIxes = [];
-        for (const p of parents) {
-          parentIxes.push(nextLanes.indexOf(p));
+        if (lanes[i] !== EMPTY_LANE_IDENTIFIER) {
+          const parents = graph.get(lanes[i])?.parents!;
+          const parentIxes = [];
+          for (const p of parents) {
+            parentIxes.push(nextLanes.indexOf(p));
+          }
+          drawingInput.push(parentIxes);
         }
-        drawingInput.push(parentIxes);
       }
     }
     const connectingLines = drawConnectingLane(drawingInput);
@@ -101,32 +112,36 @@ function drawConnectingLane(lanes: number[][]): string[] {
   return connections.map(getSymbol);
 }
 
-function getSymbol(connectorSet: Set<Connectors>): string {
-  const connectors = Array.from(connectorSet);
+const mkKey = (arr: Connectors[]): string => {
+  arr.sort();
+  const key = arr.join("_");
+  return key;
+};
+const map = {
+  [mkKey([])]: Mono.w,
+  [mkKey([Connectors.unconnected])]: Mono.w,
+  [mkKey([Connectors.down])]: Mono.vertical,
+  [mkKey([Connectors.horizontal])]: Mono.horizontal,
+  [mkKey([Connectors.enterThenLeft])]: Mono.cornerBottomRight,
+  [mkKey([Connectors.enterThenRight])]: Mono.cornerBottomLeft,
+  [mkKey([Connectors.leftThenExit])]: Mono.cornerTopLeft,
+  [mkKey([Connectors.rightThenExit])]: Mono.cornerTopRight,
 
-  if (connectors.length === 1) {
-    const connection = connectors[0];
-    switch (connection) {
-      case Connectors.unconnected:
-        return Mono.w;
-      case Connectors.down:
-        return Mono.vertical;
-      case Connectors.horizontal:
-        return Mono.horizontal;
-      case Connectors.enterThenLeft:
-        return Mono.cornerBottomRight;
-      case Connectors.enterThenRight:
-        return Mono.cornerBottomLeft;
-      case Connectors.leftThenExit:
-        return Mono.cornerTopLeft;
-      case Connectors.rightThenExit:
-        return Mono.cornerTopRight;
-    }
-  }
-  return Mono.darkGrey;
+  [mkKey([Connectors.down, Connectors.enterThenLeft])]: Mono.train4,
+  [mkKey([Connectors.down, Connectors.enterThenRight])]: Mono.train3,
+  [mkKey([Connectors.down, Connectors.leftThenExit])]: Mono.train3,
+  [mkKey([Connectors.down, Connectors.rightThenExit])]: Mono.train4,
+};
+function getSymbol(connectors: Set<Connectors>): string {
+  const key = mkKey(Array.from(connectors));
+  return map[key] ?? Mono.darkGrey;
 }
 function computeConnections(lanes: number[][]): Set<Connectors>[] {
-  const connections = lanes.flat().map((l) => new Set<Connectors>());
+  let walkSize = 0;
+  for (const l of lanes) {
+    walkSize += l.length === 0 ? 1 : l.length;
+  }
+  const connections = new Array(walkSize).fill(null).map(() => new Set<Connectors>());
   for (let i = 0; i < lanes.length; ++i) {
     let topIx = i;
     for (const bottomIx of lanes[topIx]) {
@@ -145,7 +160,7 @@ function computeConnections(lanes: number[][]): Set<Connectors>[] {
       if (topIx > bottomIx) {
         connections[topIx].add(Connectors.enterThenLeft);
         topIx -= 1;
-        while (topIx > bottomIx + 1) {
+        while (topIx > bottomIx ) {
           connections[topIx].add(Connectors.horizontal);
           topIx -= 1;
         }
