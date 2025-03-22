@@ -128,12 +128,9 @@ export function activate(context: vscode.ExtensionContext) {
         const row = {
           label: l.prefix + l.changeId,
           description: description,
+          detail: l.lineBelow
         };
         items.push(row);
-        items.push({
-          label: l.lineBelow,
-          description: "",
-        });
       }
 
       const selection = await vscode.window.showQuickPick(items, {

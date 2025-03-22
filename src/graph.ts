@@ -12,8 +12,8 @@ export function buildPrefixGraph(changes: Change[]): ChangeWithPrefix[] {
     if (lanes.includes(change.changeId)) {
       laneIx = lanes.indexOf(change.changeId);
     } else {
-      lanes.push("");
       laneIx = lanes.length;
+      lanes.push(change.changeId);
     }
 
     const prefixArray = [];
