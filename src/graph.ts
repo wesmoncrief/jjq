@@ -1,13 +1,23 @@
-import { Change } from "./jj";
+// import { Change } from "./jj";
 import { Mono } from "./mono";
 
+interface ChangeNode {
+  changeId: string;
+  parents: string[];
+}
+
+interface ChangeWithGraph {
+  changeId: string;
+  prefix: string;
+  lineBelow: string;
+}
 const EMPTY_LANE_IDENTIFIER = "empty_lane";
 // Generates a prefix
 // todo: elisions (between long parent & child chain), collapse lanes
-export function buildPrefixGraph(changes: Change[]): ChangeWithPrefix[] {
+export function buildPrefixGraph(changes: ChangeNode[]): ChangeWithGraph[] {
   const graph = mkGraph(changes);
   let lanes: string[] = [];
-  const result: ChangeWithPrefix[] = [];
+  const result: ChangeWithGraph[] = [];
   for (const change of changes) {
     let laneIx;
     if (lanes.includes(change.changeId)) {
@@ -22,7 +32,7 @@ export function buildPrefixGraph(changes: Change[]): ChangeWithPrefix[] {
       if (i === laneIx) {
         prefixArray.push(Mono.hollowDot);
       } else {
-        const sym = lanes[i]== EMPTY_LANE_IDENTIFIER ? Mono.w : Mono.vertical;
+        const sym = lanes[i] === EMPTY_LANE_IDENTIFIER ? Mono.w : Mono.vertical;
         prefixArray.push(sym);
       }
       prefixArray.push(Mono.w);
@@ -49,32 +59,11 @@ export function buildPrefixGraph(changes: Change[]): ChangeWithPrefix[] {
     while (nextLanes[nextLanes.length - 1] === EMPTY_LANE_IDENTIFIER) {
       nextLanes.pop();
     }
-    const drawingInput: number[][] = [];
-    for (let i = 0; i < lanes.length; ++i) {
-      if (lanes[i] === EMPTY_LANE_IDENTIFIER) {
-        drawingInput.push([]);
-        continue;
-      }
-      const isDirectlyThere = nextLanes.includes(lanes[i]) && lanes[i];
-      if (isDirectlyThere) {
-        drawingInput.push([i]);
-      } else {
-        if (lanes[i] !== EMPTY_LANE_IDENTIFIER) {
-          const parents = graph.get(lanes[i])?.parents!;
-          const parentIxes = [];
-          for (const p of parents) {
-            parentIxes.push(nextLanes.indexOf(p));
-          }
-          drawingInput.push(parentIxes);
-        }
-      }
-    }
+    const drawingInput: number[][] = getDrawingInput(lanes, nextLanes, graph);
     const connectingLines = drawConnectingLane(drawingInput);
     const lineBelow = connectingLines.join(Mono.w);
     result.push({
       changeId: change.changeId,
-      changeMessage: change.changeMessage,
-      isEmpty: change.isEmpty,
       prefix: prefix,
       lineBelow: lineBelow,
     });
@@ -105,6 +94,34 @@ enum Connectors {
   enterThenRight = 5,
   leftThenExit = 6,
   rightThenExit = 7,
+}
+
+function getDrawingInput(
+  lanes: string[],
+  nextLanes: string[],
+  graph: Map<string, { parents: string[]; children: string[] }>
+) {
+  const drawingInput: number[][] = [];
+  for (let i = 0; i < lanes.length; ++i) {
+    if (lanes[i] === EMPTY_LANE_IDENTIFIER) {
+      drawingInput.push([]);
+      continue;
+    }
+    const isDirectlyThere = nextLanes.includes(lanes[i]) && lanes[i];
+    if (isDirectlyThere) {
+      drawingInput.push([i]);
+    } else {
+      if (lanes[i] !== EMPTY_LANE_IDENTIFIER) {
+        const parents = graph.get(lanes[i])?.parents!;
+        const parentIxes = [];
+        for (const p of parents) {
+          parentIxes.push(nextLanes.indexOf(p));
+        }
+        drawingInput.push(parentIxes);
+      }
+    }
+  }
+  return drawingInput;
 }
 
 function drawConnectingLane(lanes: number[][]): string[] {
@@ -141,7 +158,9 @@ function computeConnections(lanes: number[][]): Set<Connectors>[] {
   for (const l of lanes) {
     walkSize += l.length === 0 ? 1 : l.length;
   }
-  const connections = new Array(walkSize).fill(null).map(() => new Set<Connectors>());
+  const connections = new Array(walkSize)
+    .fill(null)
+    .map(() => new Set<Connectors>());
   for (let i = 0; i < lanes.length; ++i) {
     let topIx = i;
     for (const bottomIx of lanes[topIx]) {
@@ -160,7 +179,7 @@ function computeConnections(lanes: number[][]): Set<Connectors>[] {
       if (topIx > bottomIx) {
         connections[topIx].add(Connectors.enterThenLeft);
         topIx -= 1;
-        while (topIx > bottomIx ) {
+        while (topIx > bottomIx) {
           connections[topIx].add(Connectors.horizontal);
           topIx -= 1;
         }
@@ -171,16 +190,8 @@ function computeConnections(lanes: number[][]): Set<Connectors>[] {
   return connections;
 }
 
-export interface ChangeWithPrefix {
-  changeId: string;
-  changeMessage: string;
-  isEmpty: boolean;
-  prefix: string;
-  lineBelow: string;
-}
-
 function mkGraph(
-  changes: Change[]
+  changes: ChangeNode[]
 ): Map<string, { parents: string[]; children: string[] }> {
   const nodes = new Map();
   for (const change of changes) {

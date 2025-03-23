@@ -118,7 +118,8 @@ export function activate(context: vscode.ExtensionContext) {
     "jjq.changes",
     async () => {
       let ungraphedLogs = await jj.log();
-      const logs = buildPrefixGraph(ungraphedLogs);
+      const prefixes = buildPrefixGraph(ungraphedLogs);
+      const logs = zipIntersection(ungraphedLogs, prefixes);
       const items = [];
       for (const l of logs) {
         const emptyNotice = l.isEmpty ? "(empty) " : "";
@@ -128,7 +129,7 @@ export function activate(context: vscode.ExtensionContext) {
         const row = {
           label: l.prefix + l.changeId,
           description: description,
-          detail: l.lineBelow
+          detail: l.lineBelow,
         };
         items.push(row);
       }
@@ -170,6 +171,10 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(changesQuickPick);
+}
+
+function zipIntersection<A, B>(a: A[], b: B[]): (A & B)[] {
+  return a.map((val, idx) => Object.assign({}, val, b[idx]));
 }
 
 // This method is called when your extension is deactivated
