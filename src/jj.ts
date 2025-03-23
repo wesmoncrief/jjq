@@ -1,21 +1,23 @@
 import ChildProcess from "child_process";
 import { promisify } from "util";
 
-// keep in sync with RawChange
 export interface Change {
   changeId: string;
   changeMessage: string;
   isEmpty: boolean;
   parents: string[]; // shortest changeId
   bookmarks: string[];
+  isImmutable: boolean;
 }
 
+// keep in sync with changeTemplate
 interface RawChange {
   changeId: string;
   changeMessage: string;
   isEmpty: string;
   parents: string; // shortest changeId
   bookmarks: string;
+  immutable: string;
 }
 
 const inFieldSeparator = "_jjq_";
@@ -25,6 +27,7 @@ const changeTemplate = {
   isEmpty: "empty",
   parents: `parents.map(|c| c.change_id().shortest()).join("${inFieldSeparator}")`,
   bookmarks: `bookmarks.map(|c| c.name()).join("${inFieldSeparator}")`,
+  immutable: "immutable",
 };
 const endEntry = "jjqend";
 
@@ -70,6 +73,7 @@ log search language spec: jj help -k revsets
         isEmpty: c.isEmpty === "true",
         parents: c.parents.split(inFieldSeparator),
         bookmarks: c.bookmarks.split(inFieldSeparator),
+        isImmutable: c.immutable === "true",
       };
     });
     return changes;

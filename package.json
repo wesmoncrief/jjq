@@ -19,8 +19,8 @@
         "category": "jjq"
       },
       {
-        "command": "jjq.demoRepoTest",
-        "title": "demo repo test",
+        "command": "jjq.setRepository",
+        "title": "Set JJ Repository Location",
         "category": "jjq"
       },
       {

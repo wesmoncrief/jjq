@@ -4,7 +4,8 @@ import * as vscode from "vscode";
 import { Change, JJ } from "./jj";
 import { Mono } from "./mono";
 import { buildPrefixes, ChangePrefixes } from "./graph";
-import { getRepositoryRoot } from "./repositoryFinder";
+import { clearRepositoryRoot, getRepositoryRoot } from "./repositoryFinder";
+import { showMessageWithTimeout } from "./showMessageWithTimeout";
 
 export function activate(context: vscode.ExtensionContext) {
   const monoTest = vscode.commands.registerCommand("jjq.monoTest", async () => {
@@ -124,15 +125,26 @@ export function activate(context: vscode.ExtensionContext) {
     - on typing a letter, clear our the graph prefixes
     - short/full commit distinction
     - better sorting (it should not do fuzzy searching, but it does)
-  - CWD is hard coded to my computer
+  - pushing bookmarks
   */
+
+  const setRepository = vscode.commands.registerCommand(
+    "jjq.setRepository",
+    async () => {
+      await clearRepositoryRoot(context);
+      await getRepositoryRoot(context);
+    }
+  );
+  context.subscriptions.push(setRepository);
 
   const changesQuickPick = vscode.commands.registerCommand(
     "jjq.changes",
     async () => {
       const repoRoot = await getRepositoryRoot(context);
-      if (!repoRoot){
-        vscode.window.showErrorMessage("Could not load repository root location");
+      if (!repoRoot) {
+        vscode.window.showErrorMessage(
+          "Could not load repository root location"
+        );
         return;
       }
       const jj = new JJ(repoRoot);
@@ -145,6 +157,7 @@ export function activate(context: vscode.ExtensionContext) {
       const prefixes = buildPrefixes(changeNodes);
       const logs = zipIntersection(ungraphedLogs, prefixes);
       const headLog = logs.find((x) => x.changeId === currentHead);
+
       const quickPickLabelToRevision: { [key: string]: string } = {};
       const items: vscode.QuickPickItem[] = [];
       const headItem = createQuickPickItem(headLog!);
@@ -184,6 +197,7 @@ export function activate(context: vscode.ExtensionContext) {
           "bookmark set",
           "bookmark delete",
           "describe",
+          "describe && new",
           "squash",
           "abandon",
           "After",
@@ -288,6 +302,12 @@ export function activate(context: vscode.ExtensionContext) {
             await handleDescribe(chosenRevisionLog, jj);
             break;
           }
+          case "describe && new": {
+            await handleDescribe(chosenRevisionLog, jj);
+            const msg = await jj.newChange(chosenRevisionLog.changeId);
+            await showMessageWithTimeout(msg.stderr);
+            break;
+          }
           case "show": {
             // opens code window with extra details
             throw new Error("nyi");
@@ -310,9 +330,8 @@ async function handleDescribe(change: Change & ChangePrefixes, jj: JJ) {
   }
   await jj.describe(change.changeId, message);
 }
-function createQuickPickItem(
-  l: Change & ChangePrefixes
-): vscode.QuickPickItem {
+
+function createQuickPickItem(l: Change & ChangePrefixes): vscode.QuickPickItem {
   const emptyNotice = l.isEmpty ? "(empty) " : "";
   const changeMessage =
     l.changeMessage === "" ? "(no description set)" : l.changeMessage;
@@ -330,48 +349,3 @@ function zipIntersection<A, B>(a: A[], b: B[]): (A & B)[] {
 
 // This method is called when your extension is deactivated
 export function deactivate() {}
-
-/**
- * Shows a message that auto closes after a certain timeout. Since there's no API for this functionality the
- * progress output is used instead, which auto closes at 100%.
- * This means the function cannot (and should not) be used for warnings or errors. These types of message require
- * the user to really take note.
- *
- * @param message The message to show.
- * @param timeout The time in milliseconds after which the message should close (default 3secs).
- */
-export const showMessageWithTimeout = (
-  message: string,
-  timeout = 3500
-): void => {
-  void vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title: message,
-      cancellable: false,
-    },
-
-    async (progress): Promise<void> => {
-      await waitFor(timeout, () => {
-        return false;
-      });
-      progress.report({ increment: 100 });
-    }
-  );
-};
-
-export const waitFor = async (
-  timeout: number,
-  condition: () => boolean
-): Promise<boolean> => {
-  while (!condition() && timeout > 0) {
-    timeout -= 100;
-    await sleep(100);
-  }
-
-  return timeout > 0 ? true : false;
-};
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}

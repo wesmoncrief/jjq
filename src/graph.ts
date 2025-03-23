@@ -5,6 +5,7 @@ interface ChangeNode {
   changeId: string;
   parents: string[];
   isHead: boolean;
+  isImmutable: boolean;
 }
 
 export interface ChangePrefixes {
@@ -30,7 +31,13 @@ export function buildPrefixes(changes: ChangeNode[]): ChangePrefixes[] {
     const prefixArray = [];
     for (let i = 0; i < lanes.length; ++i) {
       if (i === laneIx) {
-        const sym = change.isHead ? Mono.dot : Mono.hollowDot;
+        let sym = Mono.hollowDot;
+        if (change.isImmutable) {
+          sym = Mono.diamond;
+        }
+        if (change.isHead) {
+          sym = Mono.dot;
+        }
         prefixArray.push(sym);
       } else {
         const sym = lanes[i] === EMPTY_LANE_IDENTIFIER ? Mono.w : Mono.vertical;

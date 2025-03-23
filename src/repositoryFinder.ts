@@ -2,6 +2,12 @@ import * as vscode from "vscode";
 
 const REPO_KEY = "repo_cwd";
 
+export async function clearRepositoryRoot(
+  context: vscode.ExtensionContext
+): Promise<void> {
+  await context.workspaceState.update(REPO_KEY, undefined);
+  return;
+}
 export async function getRepositoryRoot(
   context: vscode.ExtensionContext
 ): Promise<string | null> {
