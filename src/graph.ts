@@ -59,9 +59,13 @@ export function buildPrefixes(changes: ChangeNode[]): ChangePrefixes[] {
       insertTracker += 1;
     }
     for (const parent of change.parents) {
-      const parentLaneIx = lanes.indexOf(parent);
-      if (parentLaneIx === -1) {
-        addNewParentLane(parent);
+      // if not here, then it should get 'elided' away
+      // TODO: do this with n=5, it wil show that we still need to reserve a parent track even if the parent doesnt' exist,
+      // IF some future element might share the same parent
+      // Actually, the way to solve this should include a topological sort (which is needed anyways)
+        const parentLaneIx = lanes.indexOf(parent);
+        if (parentLaneIx === -1) {
+          addNewParentLane(parent);
       }
     }
     while (nextLanes[nextLanes.length - 1] === EMPTY_LANE_IDENTIFIER) {
@@ -144,7 +148,7 @@ const mkKey = (arr: Connectors[]): string => {
 };
 const map = {
   [mkKey([])]: Mono.w,
-  [mkKey([Connectors.unconnected])]: Mono.w,
+  [mkKey([Connectors.unconnected])]: Mono.train2,
   [mkKey([Connectors.down])]: Mono.vertical,
   [mkKey([Connectors.horizontal])]: Mono.horizontal,
   [mkKey([Connectors.enterThenLeft])]: Mono.cornerBottomRight,
@@ -178,6 +182,10 @@ function computeConnections(lanes: number[][]): Set<Connectors>[] {
   for (let i = 0; i < lanes.length; ++i) {
     let topIx = i;
     for (const bottomIx of lanes[topIx]) {
+      if (bottomIx === -1){
+        connections[topIx].add(Connectors.unconnected);
+        continue;
+      }
       if (topIx === bottomIx) {
         connections[topIx].add(Connectors.down);
       }
