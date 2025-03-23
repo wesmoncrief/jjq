@@ -7,18 +7,17 @@ interface ChangeNode {
   isHead: boolean;
 }
 
-export interface ChangeWithGraph {
+export interface ChangePrefixes {
   changeId: string;
   prefix: string;
   lineBelow: string;
 }
 const EMPTY_LANE_IDENTIFIER = "empty_lane";
-// Generates a prefix
-// todo: elisions (between long parent & child chain), collapse lanes
-export function buildPrefixGraph(changes: ChangeNode[]): ChangeWithGraph[] {
+
+export function buildPrefixes(changes: ChangeNode[]): ChangePrefixes[] {
   const graph = mkGraph(changes);
   let lanes: string[] = [];
-  const result: ChangeWithGraph[] = [];
+  const result: ChangePrefixes[] = [];
   for (const change of changes) {
     let laneIx;
     if (lanes.includes(change.changeId)) {
@@ -150,10 +149,16 @@ const map = {
   [mkKey([Connectors.down, Connectors.enterThenRight])]: Mono.train3,
   [mkKey([Connectors.down, Connectors.leftThenExit])]: Mono.train3,
   [mkKey([Connectors.down, Connectors.rightThenExit])]: Mono.train4,
+  [mkKey([Connectors.down, Connectors.horizontal])]: Mono.train5,
 };
+
 function getSymbol(connectors: Set<Connectors>): string {
   const key = mkKey(Array.from(connectors));
-  return map[key] ?? Mono.darkGrey;
+  const symbol = map[key];
+  if (symbol) {
+    return symbol;
+  }
+  return Mono.darkGrey;
 }
 function computeConnections(lanes: number[][]): Set<Connectors>[] {
   let walkSize = 0;

@@ -14,6 +14,7 @@ export const Mono = {
   train2: "┴", // U+2534
   train3: "├", // U+251C
   train4: "┤", // U+2524
+  train5: "┼",  // U+253C 
 
   diamond: "◆", // U+25C6 (Black Diamond)
   dot: "● ", // U+25CF plus hair space

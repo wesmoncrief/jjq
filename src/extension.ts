@@ -1,9 +1,10 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
-import * as jj from "./jj";
+import { Change, JJ } from "./jj";
 import { Mono } from "./mono";
-import { buildPrefixGraph, ChangeWithGraph } from "./graph";
+import { buildPrefixes, ChangePrefixes } from "./graph";
+import { getRepositoryRoot } from "./repositoryFinder";
 
 export function activate(context: vscode.ExtensionContext) {
   const monoTest = vscode.commands.registerCommand("jjq.monoTest", async () => {
@@ -111,19 +112,37 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(demoChangesQuickPick);
-
-  const x = vscode.window.createQuickPick();
+  /* todos 
+  - write logs to the extension log destination
+  - support immutable revisions, root revision, 'diverges from remote (for bookmark)', conflict marker
+  - add a commit hash/message bar at the very bottom
+  - graphing improvements 
+    - try on other repos 
+    - elisions
+    - add tests
+  - better interaction handling in commit picker
+    - on typing a letter, clear our the graph prefixes
+    - short/full commit distinction
+    - better sorting (it should not do fuzzy searching, but it does)
+  - CWD is hard coded to my computer
+  */
 
   const changesQuickPick = vscode.commands.registerCommand(
     "jjq.changes",
     async () => {
+      const repoRoot = await getRepositoryRoot(context);
+      if (!repoRoot){
+        vscode.window.showErrorMessage("Could not load repository root location");
+        return;
+      }
+      const jj = new JJ(repoRoot);
       let currentHead = (await jj.log("@"))[0].changeId;
       let ungraphedLogs = await jj.log();
       const changeNodes = ungraphedLogs.map((x) => ({
         ...x,
         isHead: x.changeId === currentHead,
       }));
-      const prefixes = buildPrefixGraph(changeNodes);
+      const prefixes = buildPrefixes(changeNodes);
       const logs = zipIntersection(ungraphedLogs, prefixes);
       const headLog = logs.find((x) => x.changeId === currentHead);
       const quickPickLabelToRevision: { [key: string]: string } = {};
@@ -138,7 +157,7 @@ export function activate(context: vscode.ExtensionContext) {
       quickPickLabelToRevision[headItemLabel] = headLog?.changeId!;
       items.push({ label: "", kind: vscode.QuickPickItemKind.Separator });
       for (const l of logs) {
-        const qpi = createQuickPickItem(l)
+        const qpi = createQuickPickItem(l);
         items.push(qpi);
         quickPickLabelToRevision[qpi.label] = l.changeId;
       }
@@ -154,43 +173,125 @@ export function activate(context: vscode.ExtensionContext) {
       });
 
       if (selection) {
-        const chosenRevision = quickPickLabelToRevision[selection.label];
-        vscode.window.showInformationMessage(
-          `You selected: ${JSON.stringify(selection)}`
-        );
+        const chosenRevisionId = quickPickLabelToRevision[selection.label];
+        const chosenRevisionLog = logs.find(
+          (x) => x.changeId === chosenRevisionId
+        )!;
 
-        const actions = ["edit", "describe", "new", "squash", "abandon", "After", "before", "diff"];
+        const actions = [
+          "new",
+          "edit",
+          "bookmark set",
+          "bookmark delete",
+          "describe",
+          "squash",
+          "abandon",
+          "After",
+          "before",
+          "diff",
+        ];
         const action = await vscode.window.showQuickPick(actions);
         switch (action) {
-          case "edit":
-            await jj.edit(chosenRevision);
+          case "edit": {
+            const msg = await jj.edit(chosenRevisionLog.changeId);
+            await showMessageWithTimeout(msg.stderr);
             break;
-          case "diff":
+          }
+          case "diff": {
             // vscode.commands.executeCommand("vscode.diff", uri1, uri2)
             throw new Error("nyi");
             break;
-          case "new":
-            await jj.newChange(chosenRevision);
+          }
+          case "bookmark delete": {
+            const bookmarksAtRevisionLabels = chosenRevisionLog.bookmarks.map(
+              (x) => ({
+                label: x,
+              })
+            );
+            const bookmarkToDelete = await vscode.window.showQuickPick(
+              bookmarksAtRevisionLabels
+            );
+            if (!bookmarkToDelete) {
+              break;
+            }
+            await jj.deleteBookmark(
+              chosenRevisionLog.changeId,
+              bookmarkToDelete.label
+            );
+            await showMessageWithTimeout(
+              `Deleted bookmark: ${bookmarkToDelete.label}`
+            );
             break;
-          case "before":
-            await jj.before(chosenRevision);
+          }
+          case "bookmark set": {
+            const newBookmarkLabel = "New Bookmark";
+            const existingBookmarks = await jj.listBookmarks();
+            const bookmarkItems: vscode.QuickPickItem[] = [
+              { label: newBookmarkLabel },
+              { label: "", kind: vscode.QuickPickItemKind.Separator },
+              ...existingBookmarks.map((x) => ({
+                label: x,
+              })),
+            ];
+            const chosenBookmark = await vscode.window.showQuickPick(
+              bookmarkItems
+            );
+            if (!chosenBookmark) {
+              break;
+            }
+            let bookmark: string | undefined;
+            if (chosenBookmark.label === newBookmarkLabel) {
+              const newBookmark = await vscode.window.showInputBox({
+                title: "New bookmark",
+              });
+              bookmark = newBookmark;
+            } else {
+              bookmark = chosenBookmark.label;
+            }
+            if (!bookmark) {
+              // backout
+              break;
+            }
+            const msg = await jj.setBookmark(
+              chosenRevisionLog.changeId,
+              bookmark
+            );
+            await showMessageWithTimeout(msg.stderr);
             break;
-          case "After":
-            await jj.after(chosenRevision);
+          }
+          case "new": {
+            const msg = await jj.newChange(chosenRevisionLog.changeId);
+            await showMessageWithTimeout(msg.stderr);
             break;
-          case "abandon":
-            await jj.abandon(chosenRevision);
+          }
+          case "before": {
+            const msg = await jj.before(chosenRevisionLog.changeId);
+            await showMessageWithTimeout(msg.stderr);
             break;
-          case "squash":
-            await jj.squash(chosenRevision);
+          }
+          case "After": {
+            const msg = await jj.after(chosenRevisionLog.changeId);
+            await showMessageWithTimeout(msg.stderr);
             break;
-          case "describe":
-            const chosenRevisionLog = logs.find(x => x.changeId === chosenRevision);
-            await handleDescribe(chosenRevisionLog!);
+          }
+          case "abandon": {
+            const msg = await jj.abandon(chosenRevisionLog.changeId);
+            await showMessageWithTimeout(msg.stderr);
             break;
-          case "show":
+          }
+          case "squash": {
+            const msg = await jj.squash(chosenRevisionLog.changeId);
+            await showMessageWithTimeout(msg.stderr);
+            break;
+          }
+          case "describe": {
+            await handleDescribe(chosenRevisionLog, jj);
+            break;
+          }
+          case "show": {
             // opens code window with extra details
             throw new Error("nyi");
+          }
         }
       }
     }
@@ -199,19 +300,18 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(changesQuickPick);
 }
 
-async function handleDescribe(change: jj.Change & ChangeWithGraph){
+async function handleDescribe(change: Change & ChangePrefixes, jj: JJ) {
   const message = await vscode.window.showInputBox({
     title: "Describe revision " + change.changeId,
     value: change.changeMessage,
   });
-  if (message === undefined){
+  if (message === undefined) {
     return; // backout
   }
   await jj.describe(change.changeId, message);
-
 }
 function createQuickPickItem(
-  l: jj.Change & ChangeWithGraph
+  l: Change & ChangePrefixes
 ): vscode.QuickPickItem {
   const emptyNotice = l.isEmpty ? "(empty) " : "";
   const changeMessage =
@@ -220,7 +320,7 @@ function createQuickPickItem(
   return {
     label: l.prefix + Mono.w + l.changeId,
     description: description,
-    detail: l.lineBelow,
+    detail: l.lineBelow + Mono.w + Mono.w + l.bookmarks.join(Mono.w),
   };
 }
 
@@ -230,3 +330,48 @@ function zipIntersection<A, B>(a: A[], b: B[]): (A & B)[] {
 
 // This method is called when your extension is deactivated
 export function deactivate() {}
+
+/**
+ * Shows a message that auto closes after a certain timeout. Since there's no API for this functionality the
+ * progress output is used instead, which auto closes at 100%.
+ * This means the function cannot (and should not) be used for warnings or errors. These types of message require
+ * the user to really take note.
+ *
+ * @param message The message to show.
+ * @param timeout The time in milliseconds after which the message should close (default 3secs).
+ */
+export const showMessageWithTimeout = (
+  message: string,
+  timeout = 3500
+): void => {
+  void vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: message,
+      cancellable: false,
+    },
+
+    async (progress): Promise<void> => {
+      await waitFor(timeout, () => {
+        return false;
+      });
+      progress.report({ increment: 100 });
+    }
+  );
+};
+
+export const waitFor = async (
+  timeout: number,
+  condition: () => boolean
+): Promise<boolean> => {
+  while (!condition() && timeout > 0) {
+    timeout -= 100;
+    await sleep(100);
+  }
+
+  return timeout > 0 ? true : false;
+};
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
