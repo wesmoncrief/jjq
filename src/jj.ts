@@ -33,13 +33,17 @@ the defuault log template is 'present(@) | ancestors(immutable_heads().., 2) | p
 log search language spec: jj help -k revsets
 
 */
-export async function log(): Promise<Change[]> {
+export async function log(revisions?: string): Promise<Change[]> {
   const separator = "jjqseparator";
   const endEntry = "jjqend";
   const template = `'${Object.values(changeTemplate).join(
     `++ "${separator}" ++`
   )} ++ "${endEntry}"'`;
-  const { stdout } = await execArgs(["log", "-T", template, "--no-graph"], cwd);
+  const revsetArgs = revisions ? ["--revisions", revisions] : [];
+  const { stdout } = await execArgs(
+    ["log", ...revsetArgs, "--template", template, "--no-graph"],
+    cwd
+  );
 
   const strSplit = stdout.split(endEntry);
   strSplit.pop(); // last item is empty string
@@ -64,6 +68,10 @@ export async function log(): Promise<Change[]> {
   return changes;
 }
 
+export async function describe(r: string, message: string): Promise<void> {
+  await execArgs(["describe", "-r", r, "-m", message], cwd);
+}
+
 export async function edit(r: string): Promise<void> {
   await execArgs(["edit", "-r", r], cwd);
 }
@@ -78,6 +86,14 @@ export async function squash(r: string): Promise<void> {
 
 export async function abandon(r: string): Promise<void> {
   await execArgs(["abandon", "-r", r], cwd);
+}
+
+export async function after(r: string): Promise<void> {
+  await execArgs(["new", "--after", r], cwd);
+}
+
+export async function before(r: string): Promise<void> {
+  await execArgs(["new", "--before", r], cwd);
 }
 
 const exec = promisify(ChildProcess.exec);

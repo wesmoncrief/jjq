@@ -3,7 +3,7 @@
 import * as vscode from "vscode";
 import * as jj from "./jj";
 import { Mono } from "./mono";
-import { buildPrefixGraph } from "./graph";
+import { buildPrefixGraph, ChangeWithGraph } from "./graph";
 
 export function activate(context: vscode.ExtensionContext) {
   const monoTest = vscode.commands.registerCommand("jjq.monoTest", async () => {
@@ -117,50 +117,76 @@ export function activate(context: vscode.ExtensionContext) {
   const changesQuickPick = vscode.commands.registerCommand(
     "jjq.changes",
     async () => {
+      let currentHead = (await jj.log("@"))[0].changeId;
       let ungraphedLogs = await jj.log();
-      const prefixes = buildPrefixGraph(ungraphedLogs);
+      const changeNodes = ungraphedLogs.map((x) => ({
+        ...x,
+        isHead: x.changeId === currentHead,
+      }));
+      const prefixes = buildPrefixGraph(changeNodes);
       const logs = zipIntersection(ungraphedLogs, prefixes);
-      const items = [];
+      const headLog = logs.find((x) => x.changeId === currentHead);
+      const quickPickLabelToRevision: { [key: string]: string } = {};
+      const items: vscode.QuickPickItem[] = [];
+      const headItem = createQuickPickItem(headLog!);
+      const headItemLabel = "===> @ " + headLog!.changeId;
+      items.push({
+        ...headItem,
+        label: headItemLabel,
+        detail: undefined,
+      });
+      quickPickLabelToRevision[headItemLabel] = headLog?.changeId!;
+      items.push({ label: "", kind: vscode.QuickPickItemKind.Separator });
       for (const l of logs) {
-        const emptyNotice = l.isEmpty ? "(empty) " : "";
-        const changeMessage =
-          l.changeMessage === "" ? "(no description set)" : l.changeMessage;
-        const description = emptyNotice + changeMessage;
-        const row = {
-          label: l.prefix + l.changeId,
-          description: description,
-          detail: l.lineBelow,
-        };
-        items.push(row);
+        const qpi = createQuickPickItem(l)
+        items.push(qpi);
+        quickPickLabelToRevision[qpi.label] = l.changeId;
       }
 
+      // todo: use the callbacks to have precedence on the
+      // items? and hide the graphs as you start typing?
+      // const qp = await vscode.window.createQuickPick();
+      // not sure
+      // qp.keepScrollPosition = true;
+      // the 'label' for kind=separator might be cool for bookmarks? not sure if better or not
       const selection = await vscode.window.showQuickPick(items, {
-        placeHolder: "Select a change",
+        placeHolder: "Select a revision",
       });
 
       if (selection) {
+        const chosenRevision = quickPickLabelToRevision[selection.label];
         vscode.window.showInformationMessage(
           `You selected: ${JSON.stringify(selection)}`
         );
 
-        const actions = ["edit", "new", "abandon", "diff"];
+        const actions = ["edit", "describe", "new", "squash", "abandon", "After", "before", "diff"];
         const action = await vscode.window.showQuickPick(actions);
         switch (action) {
           case "edit":
-            await jj.edit(selection.label);
+            await jj.edit(chosenRevision);
             break;
           case "diff":
             // vscode.commands.executeCommand("vscode.diff", uri1, uri2)
             throw new Error("nyi");
             break;
           case "new":
-            await jj.newChange(selection.label);
+            await jj.newChange(chosenRevision);
+            break;
+          case "before":
+            await jj.before(chosenRevision);
+            break;
+          case "After":
+            await jj.after(chosenRevision);
             break;
           case "abandon":
-            await jj.abandon(selection.label);
+            await jj.abandon(chosenRevision);
             break;
           case "squash":
-            await jj.squash(selection.label);
+            await jj.squash(chosenRevision);
+            break;
+          case "describe":
+            const chosenRevisionLog = logs.find(x => x.changeId === chosenRevision);
+            await handleDescribe(chosenRevisionLog!);
             break;
           case "show":
             // opens code window with extra details
@@ -171,6 +197,31 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(changesQuickPick);
+}
+
+async function handleDescribe(change: jj.Change & ChangeWithGraph){
+  const message = await vscode.window.showInputBox({
+    title: "Describe revision " + change.changeId,
+    value: change.changeMessage,
+  });
+  if (message === undefined){
+    return; // backout
+  }
+  await jj.describe(change.changeId, message);
+
+}
+function createQuickPickItem(
+  l: jj.Change & ChangeWithGraph
+): vscode.QuickPickItem {
+  const emptyNotice = l.isEmpty ? "(empty) " : "";
+  const changeMessage =
+    l.changeMessage === "" ? "(no description set)" : l.changeMessage;
+  const description = emptyNotice + changeMessage;
+  return {
+    label: l.prefix + Mono.w + l.changeId,
+    description: description,
+    detail: l.lineBelow,
+  };
 }
 
 function zipIntersection<A, B>(a: A[], b: B[]): (A & B)[] {

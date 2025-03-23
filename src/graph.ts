@@ -4,9 +4,10 @@ import { Mono } from "./mono";
 interface ChangeNode {
   changeId: string;
   parents: string[];
+  isHead: boolean;
 }
 
-interface ChangeWithGraph {
+export interface ChangeWithGraph {
   changeId: string;
   prefix: string;
   lineBelow: string;
@@ -30,7 +31,8 @@ export function buildPrefixGraph(changes: ChangeNode[]): ChangeWithGraph[] {
     const prefixArray = [];
     for (let i = 0; i < lanes.length; ++i) {
       if (i === laneIx) {
-        prefixArray.push(Mono.hollowDot);
+        const sym = change.isHead ? Mono.dot : Mono.hollowDot;
+        prefixArray.push(sym);
       } else {
         const sym = lanes[i] === EMPTY_LANE_IDENTIFIER ? Mono.w : Mono.vertical;
         prefixArray.push(sym);
