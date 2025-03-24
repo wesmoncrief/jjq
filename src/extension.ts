@@ -123,7 +123,6 @@ export function activate(context: vscode.ExtensionContext) {
     - short/full commit distinction
     - better sorting (it should not do fuzzy searching, but it does)
     - allow searching by commit name/bookmark
-  - pushing bookmarks
   - between UI screens, propogate the chosen commit (hash+message) as the title
   - first, pull the log with graph. then, get the detail log for each of those revisions. Gives better results b/c of topological sorting from the with-graph command.
   - maybe a separate screen just for bookmarks?
@@ -214,6 +213,7 @@ async function showRevisions(context: vscode.ExtensionContext) {
       "new",
       "edit",
       "bookmark set",
+      "bookmark push",
       "bookmark delete",
       "describe",
       "squash",
@@ -245,7 +245,7 @@ async function handleRevisionSelection(
   switch (action) {
     case "edit": {
       const msg = await jj.edit(chosenRevisionLog.changeId);
-      await showMessageWithTimeout(msg.stderr);
+      showMessageWithTimeout(msg.stderr);
       return true;
     }
     case "diff": {
@@ -269,10 +269,23 @@ async function handleRevisionSelection(
         chosenRevisionLog.changeId,
         bookmarkToDelete.label
       );
-      await showMessageWithTimeout(
-        `Deleted bookmark: ${bookmarkToDelete.label}`
-      );
+      showMessageWithTimeout(`Deleted bookmark: ${bookmarkToDelete.label}`);
       return true;
+    }
+    case "bookmark push": {
+      const bookmarksAtRevisionLabels = chosenRevisionLog.localBookmarks.map(
+        (x) => ({
+          label: x,
+        })
+      );
+      const bookmark = await vscode.window.showQuickPick(
+        bookmarksAtRevisionLabels
+      );
+      if (!bookmark) {
+        return false;
+      }
+      await jj.pushBookmark(chosenRevisionLog.changeId, bookmark.label);
+      showMessageWithTimeout(`Pushed bookmark: ${bookmark.label}`);
     }
     case "bookmark set": {
       const newBookmarkLabel = "New Bookmark";
@@ -302,32 +315,46 @@ async function handleRevisionSelection(
         return false;
       }
       const msg = await jj.setBookmark(chosenRevisionLog.changeId, bookmark);
-      await showMessageWithTimeout(msg.stderr);
+      showMessageWithTimeout(msg.stderr);
+
+      const pushBookmark = await vscode.window.showQuickPick(["yes", "no"], {
+        placeHolder: "Push bookmark to origin?",
+        title: "Push bookmark to origin?",
+      });
+      if (pushBookmark === "yes") {
+        await jj.pushBookmark(chosenRevisionLog.changeId, bookmark);
+        showMessageWithTimeout("Pushed bookmark: " + bookmark);
+        return true;
+      }
+      if (pushBookmark === "no") {
+        return false;
+      }
+
       return true;
     }
     case "new": {
       const msg = await jj.newChange(chosenRevisionLog.changeId);
-      await showMessageWithTimeout(msg.stderr);
+      showMessageWithTimeout(msg.stderr);
       return true;
     }
     case "before": {
       const msg = await jj.before(chosenRevisionLog.changeId);
-      await showMessageWithTimeout(msg.stderr);
+      showMessageWithTimeout(msg.stderr);
       return true;
     }
     case "After": {
       const msg = await jj.after(chosenRevisionLog.changeId);
-      await showMessageWithTimeout(msg.stderr);
+      showMessageWithTimeout(msg.stderr);
       return true;
     }
     case "abandon": {
       const msg = await jj.abandon(chosenRevisionLog.changeId);
-      await showMessageWithTimeout(msg.stderr);
+      showMessageWithTimeout(msg.stderr);
       return true;
     }
     case "squash": {
       const msg = await jj.squash(chosenRevisionLog.changeId);
-      await showMessageWithTimeout(msg.stderr);
+      showMessageWithTimeout(msg.stderr);
       return true;
     }
     case "describe": {
@@ -365,7 +392,10 @@ function createQuickPickLogItem(
   const changeMessage =
     l.changeMessage === "" ? "(no description set)" : l.changeMessage;
   const description = emptyNotice + changeMessage;
-  const bookmarks = [...l.localBookmarks, ...l.remoteBookmarks].join(Mono.w);
+  const bookmarks = [
+    ...l.localBookmarks,
+    ...l.remoteBookmarks.map((b) => b + "@origin"),
+  ].join(Mono.w);
   return {
     label: l.prefix + Mono.w + l.changeId,
     description: description,

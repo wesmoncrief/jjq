@@ -19,19 +19,19 @@ interface RawChange {
   changeMessage: string;
   isEmpty: string;
   parents: string; // shortest changeId
-  localBookmarks: string;
-  remoteBookmarks: string;
+  bookmarks: string;
   immutable: string;
 }
 
-const inFieldSeparator = "_jjq_";
-const changeTemplate = {
+const inFieldSeparator1 = "_jjq_";
+const inFieldSeparator2 = "_jjq2_";
+// doesn't really inherit logically, but should match types
+const changeTemplate: RawChange = {
   changeId: "change_id.shortest()",
   changeMessage: "description",
   isEmpty: "empty",
-  parents: `parents.map(|c| c.change_id().shortest()).join("${inFieldSeparator}")`,
-  localBookmarks: `local_bookmarks.map(|c| c.name()).join("${inFieldSeparator}")`,
-  remoteBookmarks: `remote_bookmarks.map(|c| c.name()).join("${inFieldSeparator}")`,
+  parents: `parents.map(|c| c.change_id().shortest()).join("${inFieldSeparator1}")`,
+  bookmarks: `remote_bookmarks.map(|c| c.name() ++ "${inFieldSeparator2}" ++ c.remote()).join("${inFieldSeparator1}")`,
   immutable: "immutable",
 };
 export const endEntry = "jjqend";
@@ -83,13 +83,30 @@ log search language spec: jj help -k revsets
       return change;
     });
     const changes = rawChanges.map((c) => {
+      const remoteBookmarksWithDupes =
+        c.bookmarks.split(inFieldSeparator1);
+      const allBookmarks = remoteBookmarksWithDupes.map((b) => {
+        if (!b) {
+          return { name: "", remote: "" };
+        }
+        const [name, remote] = b.split(inFieldSeparator2);
+        return { name, remote };
+      });
+
+      const localBookmarks = allBookmarks
+        .filter((x) => x.remote === "git")
+        .map((x) => x.name);
+      const remoteBookmarks = allBookmarks
+        .filter((x) => x.remote === "origin")
+        .map((x) => x.name);
+
       const change: Change = {
         changeId: c.changeId,
         changeMessage: c.changeMessage,
         isEmpty: c.isEmpty === "true",
-        parents: c.parents.split(inFieldSeparator),
-        localBookmarks: c.localBookmarks.split(inFieldSeparator),
-        remoteBookmarks: c.remoteBookmarks.split(inFieldSeparator),
+        parents: c.parents.split(inFieldSeparator1),
+        localBookmarks: localBookmarks,
+        remoteBookmarks: remoteBookmarks,
         isImmutable: c.immutable === "true",
       };
       return change;
@@ -121,6 +138,13 @@ log search language spec: jj help -k revsets
   async deleteBookmark(r: string, bookmark: string): Promise<ExecResult> {
     return await execArgs(
       ["bookmark", "delete", `"${bookmark}"`],
+      this.rootLocation
+    );
+  }
+
+  async pushBookmark(r: string, bookmark: string): Promise<ExecResult> {
+    return await execArgs(
+      ["git", "push", "--bookmark", `"${bookmark}"`, "--allow-new"],
       this.rootLocation
     );
   }
