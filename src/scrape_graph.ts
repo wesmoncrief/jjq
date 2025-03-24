@@ -18,6 +18,7 @@ export async function scrapePrefixes(
     template,
   ]);
   const givenLines = stdout.split("\n");
+  givenLines.pop();
   const prefixes = new Array<ChangePrefixes | PrefixOnly>();
   const changeIds = new Set<string>();
   changes.forEach((c) => changeIds.add(c.changeId));
