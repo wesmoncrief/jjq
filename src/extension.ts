@@ -3,9 +3,10 @@
 import * as vscode from "vscode";
 import { Change, JJ } from "./jj";
 import { Mono } from "./mono";
-import { buildPrefixes, ChangePrefixes } from "./graph";
+import { ChangePrefixes, PrefixOnly } from "./graph";
 import { clearRepositoryRoot, getRepositoryRoot } from "./repositoryFinder";
 import { showMessageWithTimeout } from "./showMessageWithTimeout";
+import { scrapePrefixes } from "./scrape_graph";
 
 export function activate(context: vscode.ExtensionContext) {
   const monoTest = vscode.commands.registerCommand("jjq.monoTest", async () => {
@@ -119,13 +120,16 @@ export function activate(context: vscode.ExtensionContext) {
   - add a commit hash/message bar at the very bottom
   - graphing improvements 
     - try on other repos 
-    - elisions
     - add tests
   - better interaction handling in commit picker
     - on typing a letter, clear our the graph prefixes
     - short/full commit distinction
     - better sorting (it should not do fuzzy searching, but it does)
+    - allow searching by commit name/bookmark
   - pushing bookmarks
+  - between UI screens, propogate the chosen commit (hash+message) as the title
+  - first, pull the log with graph. then, get the detail log for each of those revisions. Gives better results b/c of topological sorting from the with-graph command.
+  - maybe a separate screen just for bookmarks?
   */
 
   const setRepository = vscode.commands.registerCommand(
@@ -154,13 +158,29 @@ export function activate(context: vscode.ExtensionContext) {
         ...x,
         isHead: x.changeId === currentHead,
       }));
-      const prefixes = buildPrefixes(changeNodes);
-      const logs = zipIntersection(ungraphedLogs, prefixes);
-      const headLog = logs.find((x) => x.changeId === currentHead);
+      // const prefixes = buildPrefixes(changeNodes);
+      // try {
+      const prefixes = await scrapePrefixes(new Set(changeNodes), jj);
+      // } catch (e) {
+      // console.log(e);
+      // }
+      const itemFullData: ((Change & ChangePrefixes) | PrefixOnly)[] =
+        prefixes.map((p) => {
+          if (p.isPrefixOnlyLine === true) {
+            return p;
+          }
+          return {
+            ...p,
+            ...changeNodes.find((x) => x.changeId === p.changeId)!,
+          };
+        });
+      const headLog = itemFullData.find(
+        (x) => "changeId" in x && x.changeId === currentHead
+      ) as Change & ChangePrefixes;
 
       const quickPickLabelToRevision: { [key: string]: string } = {};
       const items: vscode.QuickPickItem[] = [];
-      const headItem = createQuickPickItem(headLog!);
+      const headItem = createQuickPickLogItem(headLog!);
       const headItemLabel = "===> @ " + headLog!.changeId;
       items.push({
         ...headItem,
@@ -169,25 +189,23 @@ export function activate(context: vscode.ExtensionContext) {
       });
       quickPickLabelToRevision[headItemLabel] = headLog?.changeId!;
       items.push({ label: "", kind: vscode.QuickPickItemKind.Separator });
-      for (const l of logs) {
-        const qpi = createQuickPickItem(l);
-        items.push(qpi);
-        quickPickLabelToRevision[qpi.label] = l.changeId;
+      for (const l of itemFullData) {
+        if (l.isPrefixOnlyLine) {
+          items.push(createQuickPickPrefixOnlyItem(l));
+        } else {
+          const qpi = createQuickPickLogItem(l);
+          items.push(qpi);
+          quickPickLabelToRevision[qpi.label] = l.changeId;
+        }
       }
 
-      // todo: use the callbacks to have precedence on the
-      // items? and hide the graphs as you start typing?
-      // const qp = await vscode.window.createQuickPick();
-      // not sure
-      // qp.keepScrollPosition = true;
-      // the 'label' for kind=separator might be cool for bookmarks? not sure if better or not
       const selection = await vscode.window.showQuickPick(items, {
         placeHolder: "Select a revision",
       });
 
       if (selection) {
         const chosenRevisionId = quickPickLabelToRevision[selection.label];
-        const chosenRevisionLog = logs.find(
+        const chosenRevisionLog = changeNodes.find(
           (x) => x.changeId === chosenRevisionId
         )!;
 
@@ -320,7 +338,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(changesQuickPick);
 }
 
-async function handleDescribe(change: Change & ChangePrefixes, jj: JJ) {
+async function handleDescribe(change: Change, jj: JJ) {
   const message = await vscode.window.showInputBox({
     title: "Describe revision " + change.changeId,
     value: change.changeMessage,
@@ -330,8 +348,15 @@ async function handleDescribe(change: Change & ChangePrefixes, jj: JJ) {
   }
   await jj.describe(change.changeId, message);
 }
+function createQuickPickPrefixOnlyItem(p: PrefixOnly): vscode.QuickPickItem {
+  return {
+    label: p.prefix,
+  };
+}
 
-function createQuickPickItem(l: Change & ChangePrefixes): vscode.QuickPickItem {
+function createQuickPickLogItem(
+  l: Change & ChangePrefixes
+): vscode.QuickPickItem {
   const emptyNotice = l.isEmpty ? "(empty) " : "";
   const changeMessage =
     l.changeMessage === "" ? "(no description set)" : l.changeMessage;

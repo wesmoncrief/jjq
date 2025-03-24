@@ -1,6 +1,8 @@
 import ChildProcess from "child_process";
 import { promisify } from "util";
 
+const LOG_LIMIT = 20;
+
 export interface Change {
   changeId: string;
   changeMessage: string;
@@ -29,7 +31,7 @@ const changeTemplate = {
   bookmarks: `bookmarks.map(|c| c.name()).join("${inFieldSeparator}")`,
   immutable: "immutable",
 };
-const endEntry = "jjqend";
+export const endEntry = "jjqend";
 
 export class JJ {
   rootLocation: string;
@@ -37,6 +39,11 @@ export class JJ {
   constructor(rootLocation: string) {
     this.rootLocation = rootLocation;
   }
+
+  public async exec(args: string[]): Promise<ExecResult> {
+    return await execArgs(args, this.rootLocation);
+  }
+
   public async log(revisions?: string): Promise<Change[]> {
     /*
 the default log template is 'present(@) | ancestors(immutable_heads().., 2) | present(trunk())
@@ -48,7 +55,15 @@ log search language spec: jj help -k revsets
     )} ++ "${endEntry}"'`;
     const revsetArgs = revisions ? ["--revisions", revisions] : [];
     const { stdout } = await execArgs(
-      ["log", ...revsetArgs, "--template", template, "--no-graph"],
+      [
+        "log",
+        ...revsetArgs,
+        "--template",
+        template,
+        "--no-graph",
+        "--limit",
+        LOG_LIMIT.toString(),
+      ],
       this.rootLocation
     );
 
@@ -78,7 +93,7 @@ log search language spec: jj help -k revsets
   }
 
   async newChange(r: string): Promise<ExecResult> {
-    return await execArgs(["new", "-r", r], this.rootLocation);
+    return await execArgs(["new", r], this.rootLocation);
   }
 
   async listBookmarks(): Promise<string[]> {
@@ -93,7 +108,14 @@ log search language spec: jj help -k revsets
   }
   async setBookmark(r: string, bookmark: string): Promise<ExecResult> {
     return await execArgs(
-      ["bookmark", "set", `"${bookmark}"`, "-r", r, "--allow-backwards"],
+      [
+        "bookmark",
+        "set",
+        `"${bookmark}"`,
+        "--revisions",
+        r,
+        "--allow-backwards",
+      ],
       this.rootLocation
     );
   }
@@ -107,21 +129,21 @@ log search language spec: jj help -k revsets
 
   async describe(r: string, message: string): Promise<ExecResult> {
     return await execArgs(
-      ["describe", "-r", r, "-m", `"${message}"`],
+      ["describe", "--revisions", r, "--message", `"${message}"`],
       this.rootLocation
     );
   }
 
   async edit(r: string): Promise<ExecResult> {
-    return await execArgs(["edit", "-r", r], this.rootLocation);
+    return await execArgs(["edit", "--revisions", r], this.rootLocation);
   }
 
   async squash(r: string): Promise<ExecResult> {
-    return await execArgs(["squash", "-r", r], this.rootLocation);
+    return await execArgs(["squash", "--revisions", r], this.rootLocation);
   }
 
   async abandon(r: string): Promise<ExecResult> {
-    return await execArgs(["abandon", "-r", r], this.rootLocation);
+    return await execArgs(["abandon", "--revisions", r], this.rootLocation);
   }
 
   async after(r: string): Promise<ExecResult> {

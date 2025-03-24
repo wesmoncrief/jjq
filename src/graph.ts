@@ -1,7 +1,7 @@
 // import { Change } from "./jj";
 import { Mono } from "./mono";
 
-interface ChangeNode {
+export interface ChangeNode {
   changeId: string;
   parents: string[];
   isHead: boolean;
@@ -12,7 +12,14 @@ export interface ChangePrefixes {
   changeId: string;
   prefix: string;
   lineBelow: string;
+  isPrefixOnlyLine: false;
 }
+
+export interface PrefixOnly {
+  prefix: string;
+  isPrefixOnlyLine: true;
+}
+
 const EMPTY_LANE_IDENTIFIER = "empty_lane";
 
 export function buildPrefixes(changes: ChangeNode[]): ChangePrefixes[] {
@@ -78,6 +85,7 @@ export function buildPrefixes(changes: ChangeNode[]): ChangePrefixes[] {
       changeId: change.changeId,
       prefix: prefix,
       lineBelow: lineBelow,
+      isPrefixOnlyLine: false,
     });
     lanes = nextLanes;
   }
