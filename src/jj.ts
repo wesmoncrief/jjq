@@ -53,7 +53,7 @@ log search language spec: jj help -k revsets
     const template = `'${Object.values(changeTemplate).join(
       `++ "${separator}" ++`
     )} ++ "${endEntry}"'`;
-    const revsetArgs = revisions ? ["--revisions", revisions] : [];
+    const revsetArgs = revisions ? ["-r", revisions] : [];
     const { stdout } = await execArgs(
       [
         "log",
@@ -112,7 +112,7 @@ log search language spec: jj help -k revsets
         "bookmark",
         "set",
         `"${bookmark}"`,
-        "--revisions",
+        "-r",
         r,
         "--allow-backwards",
       ],
@@ -129,21 +129,21 @@ log search language spec: jj help -k revsets
 
   async describe(r: string, message: string): Promise<ExecResult> {
     return await execArgs(
-      ["describe", "--revisions", r, "--message", `"${message}"`],
+      ["describe", "-r", r, "--message", `"${message}"`],
       this.rootLocation
     );
   }
 
   async edit(r: string): Promise<ExecResult> {
-    return await execArgs(["edit", "--revisions", r], this.rootLocation);
+    return await execArgs(["edit", "-r", r], this.rootLocation);
   }
 
   async squash(r: string): Promise<ExecResult> {
-    return await execArgs(["squash", "--revisions", r], this.rootLocation);
+    return await execArgs(["squash", "-r", r], this.rootLocation);
   }
 
   async abandon(r: string): Promise<ExecResult> {
-    return await execArgs(["abandon", "--revisions", r], this.rootLocation);
+    return await execArgs(["abandon", "-r", r], this.rootLocation);
   }
 
   async after(r: string): Promise<ExecResult> {
