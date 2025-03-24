@@ -118,9 +118,6 @@ export function activate(context: vscode.ExtensionContext) {
   - write logs to the extension log destination
   - support immutable revisions, root revision, 'diverges from remote (for bookmark)', conflict marker
   - add a commit hash/message bar at the very bottom
-  - graphing improvements 
-    - try on other repos 
-    - add tests
   - better interaction handling in commit picker
     - on typing a letter, clear our the graph prefixes
     - short/full commit distinction
@@ -131,6 +128,7 @@ export function activate(context: vscode.ExtensionContext) {
   - first, pull the log with graph. then, get the detail log for each of those revisions. Gives better results b/c of topological sorting from the with-graph command.
   - maybe a separate screen just for bookmarks?
   - make the quickPick run itself in a loop. this is pretty nice for verifying changes, and also for the describe+new use-case. Runs until it's 'escaped'.
+  - don't re-build the graph when just changing the 'edit' - a bit nicer b/c the rebuild can be jarring if a lot change
   */
 
   const setRepository = vscode.commands.registerCommand(
@@ -242,15 +240,7 @@ async function showRevisions(context: vscode.ExtensionContext) {
 async function handleRevisionSelection(
   action: string,
   jj: JJ,
-  chosenRevisionLog: {
-    isHead: boolean;
-    changeId: string;
-    changeMessage: string;
-    isEmpty: boolean;
-    parents: string[];
-    bookmarks: string[];
-    isImmutable: boolean;
-  }
+  chosenRevisionLog: Change
 ): Promise<boolean> {
   switch (action) {
     case "edit": {
@@ -264,7 +254,7 @@ async function handleRevisionSelection(
       break;
     }
     case "bookmark delete": {
-      const bookmarksAtRevisionLabels = chosenRevisionLog.bookmarks.map(
+      const bookmarksAtRevisionLabels = chosenRevisionLog.localBookmarks.map(
         (x) => ({
           label: x,
         })
@@ -375,10 +365,11 @@ function createQuickPickLogItem(
   const changeMessage =
     l.changeMessage === "" ? "(no description set)" : l.changeMessage;
   const description = emptyNotice + changeMessage;
+  const bookmarks = [...l.localBookmarks, ...l.remoteBookmarks].join(Mono.w);
   return {
     label: l.prefix + Mono.w + l.changeId,
     description: description,
-    detail: l.lineBelow + Mono.w + Mono.w + l.bookmarks.join(Mono.w),
+    detail: l.lineBelow + Mono.w + Mono.w + bookmarks,
   };
 }
 

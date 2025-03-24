@@ -8,7 +8,8 @@ export interface Change {
   changeMessage: string;
   isEmpty: boolean;
   parents: string[]; // shortest changeId
-  bookmarks: string[];
+  localBookmarks: string[];
+  remoteBookmarks: string[];
   isImmutable: boolean;
 }
 
@@ -18,7 +19,8 @@ interface RawChange {
   changeMessage: string;
   isEmpty: string;
   parents: string; // shortest changeId
-  bookmarks: string;
+  localBookmarks: string;
+  remoteBookmarks: string;
   immutable: string;
 }
 
@@ -28,7 +30,8 @@ const changeTemplate = {
   changeMessage: "description",
   isEmpty: "empty",
   parents: `parents.map(|c| c.change_id().shortest()).join("${inFieldSeparator}")`,
-  bookmarks: `bookmarks.map(|c| c.name()).join("${inFieldSeparator}")`,
+  localBookmarks: `local_bookmarks.map(|c| c.name()).join("${inFieldSeparator}")`,
+  remoteBookmarks: `remote_bookmarks.map(|c| c.name()).join("${inFieldSeparator}")`,
   immutable: "immutable",
 };
 export const endEntry = "jjqend";
@@ -80,14 +83,16 @@ log search language spec: jj help -k revsets
       return change;
     });
     const changes = rawChanges.map((c) => {
-      return {
+      const change: Change = {
         changeId: c.changeId,
         changeMessage: c.changeMessage,
         isEmpty: c.isEmpty === "true",
         parents: c.parents.split(inFieldSeparator),
-        bookmarks: c.bookmarks.split(inFieldSeparator),
+        localBookmarks: c.localBookmarks.split(inFieldSeparator),
+        remoteBookmarks: c.remoteBookmarks.split(inFieldSeparator),
         isImmutable: c.immutable === "true",
       };
+      return change;
     });
     return changes;
   }
@@ -108,14 +113,7 @@ log search language spec: jj help -k revsets
   }
   async setBookmark(r: string, bookmark: string): Promise<ExecResult> {
     return await execArgs(
-      [
-        "bookmark",
-        "set",
-        `"${bookmark}"`,
-        "-r",
-        r,
-        "--allow-backwards",
-      ],
+      ["bookmark", "set", `"${bookmark}"`, "-r", r, "--allow-backwards"],
       this.rootLocation
     );
   }
