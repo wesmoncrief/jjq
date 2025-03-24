@@ -145,209 +145,222 @@ export function activate(context: vscode.ExtensionContext) {
   const changesQuickPick = vscode.commands.registerCommand(
     "jjq.changes",
     async () => {
-      const repoRoot = await getRepositoryRoot(context);
-      if (!repoRoot) {
-        vscode.window.showErrorMessage(
-          "Could not load repository root location"
-        );
-        return;
-      }
-      const jj = new JJ(repoRoot);
-      let currentHead = (await jj.log("@"))[0].changeId;
-      let ungraphedLogs = await jj.log();
-      const changeNodes = ungraphedLogs.map((x) => ({
-        ...x,
-        isHead: x.changeId === currentHead,
-      }));
-      // const prefixes = buildPrefixes(changeNodes);
-      // try {
-      const prefixes = await scrapePrefixes(new Set(changeNodes), jj);
-      // } catch (e) {
-      // console.log(e);
-      // }
-      const itemFullData: ((Change & ChangePrefixes) | PrefixOnly)[] =
-        prefixes.map((p) => {
-          if (p.isPrefixOnlyLine === true) {
-            return p;
-          }
-          return {
-            ...p,
-            ...changeNodes.find((x) => x.changeId === p.changeId)!,
-          };
-        });
-      const headLog = itemFullData.find(
-        (x) => "changeId" in x && x.changeId === currentHead
-      ) as Change & ChangePrefixes;
-
-      const quickPickLabelToRevision: { [key: string]: string } = {};
-      const items: vscode.QuickPickItem[] = [];
-      const headItem = createQuickPickLogItem(headLog!);
-      const headItemLabel = "===> @ " + headLog!.changeId;
-      items.push({
-        ...headItem,
-        label: headItemLabel,
-        detail: undefined,
-      });
-      quickPickLabelToRevision[headItemLabel] = headLog?.changeId!;
-      items.push({ label: "", kind: vscode.QuickPickItemKind.Separator });
-      for (const l of itemFullData) {
-        if (l.isPrefixOnlyLine) {
-          items.push(createQuickPickPrefixOnlyItem(l));
-        } else {
-          const qpi = createQuickPickLogItem(l);
-          items.push(qpi);
-          quickPickLabelToRevision[qpi.label] = l.changeId;
-        }
-      }
-
-      const selection = await vscode.window.showQuickPick(items, {
-        placeHolder: "Select a revision",
-      });
-
-      if (selection) {
-        const chosenRevisionId = quickPickLabelToRevision[selection.label];
-        const chosenRevisionLog = changeNodes.find(
-          (x) => x.changeId === chosenRevisionId
-        )!;
-
-        const actions = [
-          "new",
-          "edit",
-          "bookmark set",
-          "bookmark delete",
-          "describe",
-          "describe && new",
-          "squash",
-          "abandon",
-          "After",
-          "before",
-          "diff",
-        ];
-        const action = await vscode.window.showQuickPick(actions);
-        switch (action) {
-          case "edit": {
-            const msg = await jj.edit(chosenRevisionLog.changeId);
-            await showMessageWithTimeout(msg.stderr);
-            break;
-          }
-          case "diff": {
-            // vscode.commands.executeCommand("vscode.diff", uri1, uri2)
-            throw new Error("nyi");
-            break;
-          }
-          case "bookmark delete": {
-            const bookmarksAtRevisionLabels = chosenRevisionLog.bookmarks.map(
-              (x) => ({
-                label: x,
-              })
-            );
-            const bookmarkToDelete = await vscode.window.showQuickPick(
-              bookmarksAtRevisionLabels
-            );
-            if (!bookmarkToDelete) {
-              break;
-            }
-            await jj.deleteBookmark(
-              chosenRevisionLog.changeId,
-              bookmarkToDelete.label
-            );
-            await showMessageWithTimeout(
-              `Deleted bookmark: ${bookmarkToDelete.label}`
-            );
-            break;
-          }
-          case "bookmark set": {
-            const newBookmarkLabel = "New Bookmark";
-            const existingBookmarks = await jj.listBookmarks();
-            const bookmarkItems: vscode.QuickPickItem[] = [
-              { label: newBookmarkLabel },
-              { label: "", kind: vscode.QuickPickItemKind.Separator },
-              ...existingBookmarks.map((x) => ({
-                label: x,
-              })),
-            ];
-            const chosenBookmark = await vscode.window.showQuickPick(
-              bookmarkItems
-            );
-            if (!chosenBookmark) {
-              break;
-            }
-            let bookmark: string | undefined;
-            if (chosenBookmark.label === newBookmarkLabel) {
-              const newBookmark = await vscode.window.showInputBox({
-                title: "New bookmark",
-              });
-              bookmark = newBookmark;
-            } else {
-              bookmark = chosenBookmark.label;
-            }
-            if (!bookmark) {
-              // backout
-              break;
-            }
-            const msg = await jj.setBookmark(
-              chosenRevisionLog.changeId,
-              bookmark
-            );
-            await showMessageWithTimeout(msg.stderr);
-            break;
-          }
-          case "new": {
-            const msg = await jj.newChange(chosenRevisionLog.changeId);
-            await showMessageWithTimeout(msg.stderr);
-            break;
-          }
-          case "before": {
-            const msg = await jj.before(chosenRevisionLog.changeId);
-            await showMessageWithTimeout(msg.stderr);
-            break;
-          }
-          case "After": {
-            const msg = await jj.after(chosenRevisionLog.changeId);
-            await showMessageWithTimeout(msg.stderr);
-            break;
-          }
-          case "abandon": {
-            const msg = await jj.abandon(chosenRevisionLog.changeId);
-            await showMessageWithTimeout(msg.stderr);
-            break;
-          }
-          case "squash": {
-            const msg = await jj.squash(chosenRevisionLog.changeId);
-            await showMessageWithTimeout(msg.stderr);
-            break;
-          }
-          case "describe": {
-            await handleDescribe(chosenRevisionLog, jj);
-            break;
-          }
-          case "describe && new": {
-            await handleDescribe(chosenRevisionLog, jj);
-            const msg = await jj.newChange(chosenRevisionLog.changeId);
-            await showMessageWithTimeout(msg.stderr);
-            break;
-          }
-          case "show": {
-            // opens code window with extra details
-            throw new Error("nyi");
-          }
-        }
-      }
+      await showRevisions(context);
     }
   );
 
   context.subscriptions.push(changesQuickPick);
 }
 
-async function handleDescribe(change: Change, jj: JJ) {
+async function showRevisions(context: vscode.ExtensionContext) {
+  const repoRoot = await getRepositoryRoot(context);
+  if (!repoRoot) {
+    vscode.window.showErrorMessage("Could not load repository root location");
+    return;
+  }
+  const jj = new JJ(repoRoot);
+  let currentHead = (await jj.log("@"))[0].changeId;
+  let ungraphedLogs = await jj.log();
+  const changeNodes = ungraphedLogs.map((x) => ({
+    ...x,
+    isHead: x.changeId === currentHead,
+  }));
+  const prefixes = await scrapePrefixes(new Set(changeNodes), jj);
+  const itemFullData: ((Change & ChangePrefixes) | PrefixOnly)[] = prefixes.map(
+    (p) => {
+      if (p.isPrefixOnlyLine === true) {
+        return p;
+      }
+      return {
+        ...p,
+        ...changeNodes.find((x) => x.changeId === p.changeId)!,
+      };
+    }
+  );
+  const headLog = itemFullData.find(
+    (x) => "changeId" in x && x.changeId === currentHead
+  ) as Change & ChangePrefixes;
+
+  const quickPickLabelToRevision: { [key: string]: string } = {};
+  const items: vscode.QuickPickItem[] = [];
+  const headItem = createQuickPickLogItem(headLog!);
+  const headItemLabel = "===> @ " + headLog!.changeId;
+  items.push({
+    ...headItem,
+    label: headItemLabel,
+    detail: undefined,
+  });
+  quickPickLabelToRevision[headItemLabel] = headLog?.changeId!;
+  items.push({ label: "", kind: vscode.QuickPickItemKind.Separator });
+  for (const l of itemFullData) {
+    if (l.isPrefixOnlyLine) {
+      items.push(createQuickPickPrefixOnlyItem(l));
+    } else {
+      const qpi = createQuickPickLogItem(l);
+      items.push(qpi);
+      quickPickLabelToRevision[qpi.label] = l.changeId;
+    }
+  }
+
+  const selection = await vscode.window.showQuickPick(items, {
+    placeHolder: "Select a revision",
+  });
+
+  if (selection) {
+    const chosenRevisionId = quickPickLabelToRevision[selection.label];
+    const chosenRevisionLog = changeNodes.find(
+      (x) => x.changeId === chosenRevisionId
+    )!;
+
+    const actions = [
+      "new",
+      "edit",
+      "bookmark set",
+      "bookmark delete",
+      "describe",
+      "squash",
+      "abandon",
+      "After",
+      "before",
+      "diff",
+    ];
+    const action = await vscode.window.showQuickPick(actions);
+    if (action) {
+      const completedScreens = await handleRevisionSelection(
+        action,
+        jj,
+        chosenRevisionLog
+      );
+      if (completedScreens) {
+        return showRevisions(context);
+      }
+    }
+  }
+}
+
+// returns 'true' if the revision selector should be called again
+async function handleRevisionSelection(
+  action: string,
+  jj: JJ,
+  chosenRevisionLog: {
+    isHead: boolean;
+    changeId: string;
+    changeMessage: string;
+    isEmpty: boolean;
+    parents: string[];
+    bookmarks: string[];
+    isImmutable: boolean;
+  }
+): Promise<boolean> {
+  switch (action) {
+    case "edit": {
+      const msg = await jj.edit(chosenRevisionLog.changeId);
+      await showMessageWithTimeout(msg.stderr);
+      return true;
+    }
+    case "diff": {
+      // vscode.commands.executeCommand("vscode.diff", uri1, uri2)
+      throw new Error("nyi");
+      break;
+    }
+    case "bookmark delete": {
+      const bookmarksAtRevisionLabels = chosenRevisionLog.bookmarks.map(
+        (x) => ({
+          label: x,
+        })
+      );
+      const bookmarkToDelete = await vscode.window.showQuickPick(
+        bookmarksAtRevisionLabels
+      );
+      if (!bookmarkToDelete) {
+        return false;
+      }
+      await jj.deleteBookmark(
+        chosenRevisionLog.changeId,
+        bookmarkToDelete.label
+      );
+      await showMessageWithTimeout(
+        `Deleted bookmark: ${bookmarkToDelete.label}`
+      );
+      return true;
+    }
+    case "bookmark set": {
+      const newBookmarkLabel = "New Bookmark";
+      const existingBookmarks = await jj.listBookmarks();
+      const bookmarkItems: vscode.QuickPickItem[] = [
+        { label: newBookmarkLabel },
+        { label: "", kind: vscode.QuickPickItemKind.Separator },
+        ...existingBookmarks.map((x) => ({
+          label: x,
+        })),
+      ];
+      const chosenBookmark = await vscode.window.showQuickPick(bookmarkItems);
+      if (!chosenBookmark) {
+        break;
+      }
+      let bookmark: string | undefined;
+      if (chosenBookmark.label === newBookmarkLabel) {
+        const newBookmark = await vscode.window.showInputBox({
+          title: "New bookmark",
+        });
+        bookmark = newBookmark;
+      } else {
+        bookmark = chosenBookmark.label;
+      }
+      if (!bookmark) {
+        // backout
+        return false;
+      }
+      const msg = await jj.setBookmark(chosenRevisionLog.changeId, bookmark);
+      await showMessageWithTimeout(msg.stderr);
+      return true;
+    }
+    case "new": {
+      const msg = await jj.newChange(chosenRevisionLog.changeId);
+      await showMessageWithTimeout(msg.stderr);
+      return true;
+    }
+    case "before": {
+      const msg = await jj.before(chosenRevisionLog.changeId);
+      await showMessageWithTimeout(msg.stderr);
+      return true;
+    }
+    case "After": {
+      const msg = await jj.after(chosenRevisionLog.changeId);
+      await showMessageWithTimeout(msg.stderr);
+      return true;
+    }
+    case "abandon": {
+      const msg = await jj.abandon(chosenRevisionLog.changeId);
+      await showMessageWithTimeout(msg.stderr);
+      return true;
+    }
+    case "squash": {
+      const msg = await jj.squash(chosenRevisionLog.changeId);
+      await showMessageWithTimeout(msg.stderr);
+      return true;
+    }
+    case "describe": {
+      return await handleDescribe(chosenRevisionLog, jj);
+    }
+    case "show": {
+      // opens code window with extra details
+      throw new Error("nyi");
+    }
+  }
+  throw new Error("nyi: " + action);
+}
+
+async function handleDescribe(change: Change, jj: JJ): Promise<boolean> {
   const message = await vscode.window.showInputBox({
     title: "Describe revision " + change.changeId,
     value: change.changeMessage,
   });
   if (message === undefined) {
-    return; // backout
+    return false; // backout
   }
   await jj.describe(change.changeId, message);
+  return true;
 }
 function createQuickPickPrefixOnlyItem(p: PrefixOnly): vscode.QuickPickItem {
   return {
