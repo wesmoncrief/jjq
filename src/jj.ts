@@ -11,6 +11,7 @@ export interface Change {
   localBookmarks: string[];
   remoteBookmarks: string[];
   isImmutable: boolean;
+  conflict: boolean;
 }
 
 // keep in sync with changeTemplate
@@ -21,6 +22,7 @@ interface RawChange {
   parents: string; // shortest changeId
   bookmarks: string;
   immutable: string;
+  conflict: string;
 }
 
 const inFieldSeparator1 = "_jjq_";
@@ -33,6 +35,7 @@ const changeTemplate: RawChange = {
   parents: `parents.map(|c| c.change_id().shortest()).join("${inFieldSeparator1}")`,
   bookmarks: `remote_bookmarks.map(|c| c.name() ++ "${inFieldSeparator2}" ++ c.remote()).join("${inFieldSeparator1}")`,
   immutable: "immutable",
+  conflict: "conflict",
 };
 export const endEntry = "jjqend";
 
@@ -108,6 +111,7 @@ log search language spec: jj help -k revsets
         localBookmarks: localBookmarks,
         remoteBookmarks: remoteBookmarks,
         isImmutable: c.immutable === "true",
+        conflict: c.conflict === "true",
       };
       return change;
     });

@@ -116,8 +116,8 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(demoChangesQuickPick);
   /* todos 
   - write logs to the extension log destination
-  - support immutable revisions, root revision, 'diverges from remote (for bookmark)', conflict marker
   - add a commit hash/message bar at the very bottom
+  - support for opening pull requests
   - better interaction handling in commit picker
     - on typing a letter, clear our the graph prefixes
     - short/full commit distinction
@@ -129,6 +129,7 @@ export function activate(context: vscode.ExtensionContext) {
   - first, pull the log with graph. then, get the detail log for each of those revisions. Gives better results b/c of topological sorting from the with-graph command.
   - maybe a separate screen just for bookmarks?
   - don't re-build the graph when just changing the 'edit' - a bit nicer b/c the rebuild can be jarring if a lot change
+  - support 'diverges from remote' type bookmark conflict?
   */
 
   const setRepository = vscode.commands.registerCommand(
@@ -447,7 +448,8 @@ function createQuickPickLogItem(
   const emptyNotice = l.isEmpty ? "(empty) " : "";
   const changeMessage =
     l.changeMessage === "" ? "(no description set)" : l.changeMessage;
-  const description = emptyNotice + changeMessage;
+  const conflictNotice = l.conflict ? " (conflicted) " : "";
+  const description = conflictNotice + emptyNotice + changeMessage;
   const bookmarks = [
     ...l.localBookmarks,
     ...l.remoteBookmarks.map((b) => b + "@origin"),
