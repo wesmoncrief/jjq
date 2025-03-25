@@ -213,9 +213,7 @@ async function showRevisions(context: vscode.ExtensionContext) {
     const actions = [
       { label: "n", description: "new" },
       { label: "e", description: "edit" },
-      { label: "b", description: "bookmark set" },
-      { label: "b", description: "bookmark push" },
-      { label: "b", description: "bookmark delete" },
+      { label: "b", description: "bookmarks" },
       { label: "d", description: "describe" },
       { label: "s", description: "squash" },
       { label: "a", description: "abandon" },
@@ -223,44 +221,61 @@ async function showRevisions(context: vscode.ExtensionContext) {
       { label: "B", description: "before" },
       { label: "D", description: "diff" },
     ];
-    const actionQp = vscode.window.createQuickPick<vscode.QuickPickItem>();
-    actionQp.items = actions;
-    actionQp.onDidChangeValue(async (e) => {
-      const action = actions.filter((x) => x.label === e)[0];
-      actionQp.hide();
-      if (action) {
-        const completedScreens = await handleRevisionSelection(
-          action.description!,
-          jj,
-          chosenRevisionLog
-        );
-        if (completedScreens) {
-          return showRevisions(context);
-        }
+
+    const action = await showQuickerPick(actions);
+    if (action) {
+      const completedScreens = await handleRevisionAction(
+        action.description!,
+        jj,
+        chosenRevisionLog
+      );
+      if (completedScreens) {
+        return showRevisions(context);
       }
-    });
-    actionQp.show();
+    }
   }
 }
 
-// returns 'true' if the revision selector should be called again
-async function handleRevisionSelection(
-  action: string,
+function showQuickerPick(
+  items: vscode.QuickPickItem[],
+  opts?: {
+    placeholder?: string;
+    title?: string;
+  }
+): Promise<vscode.QuickPickItem | undefined> {
+  const qp = vscode.window.createQuickPick<vscode.QuickPickItem>();
+  qp.items = items;
+  qp.title = opts?.title;
+  qp.placeholder = opts?.placeholder;
+  const result: Promise<vscode.QuickPickItem> = new Promise(
+    (resolve, reject) => {
+      qp.onDidChangeValue(async (e) => {
+        const selection = items.filter((x) => x.label === e)[0];
+        qp.hide();
+        resolve(selection);
+      });
+      qp.onDidAccept((i) => {
+        qp.hide();
+        resolve(qp.selectedItems[0]);
+      });
+    }
+  );
+  qp.show();
+  return result;
+}
+
+async function handleBookmarkRevisionAction(
   jj: JJ,
   chosenRevisionLog: Change
 ): Promise<boolean> {
+  const actionItem = await showQuickerPick([
+    { label: "d", description: "delete" },
+    { label: "p", description: "push" },
+    { label: "s", description: "set" },
+  ]);
+  const action = actionItem?.description;
   switch (action) {
-    case "edit": {
-      const msg = await jj.edit(chosenRevisionLog.changeId);
-      showMessageWithTimeout(msg.stderr);
-      return true;
-    }
-    case "diff": {
-      // vscode.commands.executeCommand("vscode.diff", uri1, uri2)
-      throw new Error("nyi");
-      break;
-    }
-    case "bookmark delete": {
+    case "delete": {
       const bookmarksAtRevisionLabels = chosenRevisionLog.localBookmarks.map(
         (x) => ({
           label: x,
@@ -279,7 +294,7 @@ async function handleRevisionSelection(
       showMessageWithTimeout(`Deleted bookmark: ${bookmarkToDelete.label}`);
       return true;
     }
-    case "bookmark push": {
+    case "push": {
       const bookmarksAtRevisionLabels = chosenRevisionLog.localBookmarks.map(
         (x) => ({
           label: x,
@@ -294,7 +309,7 @@ async function handleRevisionSelection(
       await jj.pushBookmark(chosenRevisionLog.changeId, bookmark.label);
       showMessageWithTimeout(`Pushed bookmark: ${bookmark.label}`);
     }
-    case "bookmark set": {
+    case "set": {
       const newBookmarkLabel = "New Bookmark";
       const existingBookmarks = await jj.listBookmarks();
       const bookmarkItems: vscode.QuickPickItem[] = [
@@ -324,20 +339,54 @@ async function handleRevisionSelection(
       const msg = await jj.setBookmark(chosenRevisionLog.changeId, bookmark);
       showMessageWithTimeout(msg.stderr);
 
-      const pushBookmark = await vscode.window.showQuickPick(["yes", "no"], {
-        placeHolder: "Push bookmark to origin?",
-        title: "Push bookmark to origin?",
-      });
-      if (pushBookmark === "yes") {
+      const pushBookmark = (
+        await showQuickerPick(
+          [
+            { label: "y" },
+            {
+              label: "n",
+            },
+          ],
+          {
+            placeholder: "Push bookmark to origin?",
+            title: "Push bookmark to origin?",
+          }
+        )
+      )?.label;
+      if (pushBookmark === "y") {
         await jj.pushBookmark(chosenRevisionLog.changeId, bookmark);
         showMessageWithTimeout("Pushed bookmark: " + bookmark);
         return true;
       }
-      if (pushBookmark === "no") {
-        return false;
+      if (pushBookmark === "n") {
+        return true;
       }
 
+      return false;
+    }
+  }
+  return false;
+}
+
+// returns 'true' if the revision selector should be called again
+async function handleRevisionAction(
+  action: string,
+  jj: JJ,
+  chosenRevisionLog: Change
+): Promise<boolean> {
+  switch (action) {
+    case "edit": {
+      const msg = await jj.edit(chosenRevisionLog.changeId);
+      showMessageWithTimeout(msg.stderr);
       return true;
+    }
+    case "diff": {
+      // vscode.commands.executeCommand("vscode.diff", uri1, uri2)
+      throw new Error("nyi");
+      break;
+    }
+    case "bookmarks": {
+      return await handleBookmarkRevisionAction(jj, chosenRevisionLog);
     }
     case "new": {
       const msg = await jj.newChange(chosenRevisionLog.changeId);
