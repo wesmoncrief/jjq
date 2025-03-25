@@ -1,4 +1,3 @@
-
 export const Mono = {
   hair: " ",
   w: `               `, // hair spaces
@@ -15,7 +14,7 @@ export const Mono = {
   train2: "┴", // U+2534
   train3: "├", // U+251C
   train4: "┤", // U+2524
-  train5: "┼",  // U+253C 
+  train5: "┼", // U+253C
 
   diamond: "◆", // U+25C6 (Black Diamond)
   dot: "● ", // U+25CF plus hair space
@@ -23,6 +22,11 @@ export const Mono = {
 
   // hollowTracedDot: "◌ ", // U+25CC plus hair space
   darkGrey: "▓", // U+2593 (Dark Shade)
+
+  // includes hairs
+  tilde: " ~  ", // U+2593 (Dark Shade)
+  at: " @",
+  x: "    x",
 };
 
 export const MONO_MAP: { [key: string]: string } = {
@@ -43,4 +47,7 @@ export const MONO_MAP: { [key: string]: string } = {
   "○": Mono.hollowDot,
   "●": Mono.dot,
   "◆": Mono.diamond,
+  "~": Mono.tilde,
+  "@": Mono.at,
+  "x": Mono.x,
 };

@@ -123,10 +123,10 @@ export function activate(context: vscode.ExtensionContext) {
     - short/full commit distinction
     - better sorting (it should not do fuzzy searching, but it does)
     - allow searching by commit name/bookmark
+    - immediately reload the quickpick, and asynchronously let the repo updates happen
   - between UI screens, propogate the chosen commit (hash+message) as the title
   - first, pull the log with graph. then, get the detail log for each of those revisions. Gives better results b/c of topological sorting from the with-graph command.
   - maybe a separate screen just for bookmarks?
-  - make the quickPick run itself in a loop. this is pretty nice for verifying changes, and also for the describe+new use-case. Runs until it's 'escaped'.
   - don't re-build the graph when just changing the 'edit' - a bit nicer b/c the rebuild can be jarring if a lot change
   */
 
