@@ -124,6 +124,7 @@ export function activate(context: vscode.ExtensionContext) {
     - better sorting (it should not do fuzzy searching, but it does)
     - allow searching by commit name/bookmark
     - immediately reload the quickpick, and asynchronously let the repo updates happen
+    - probably want a single quickPick instance?
   - between UI screens, propogate the chosen commit (hash+message) as the title
   - first, pull the log with graph. then, get the detail log for each of those revisions. Gives better results b/c of topological sorting from the with-graph command.
   - maybe a separate screen just for bookmarks?
@@ -210,29 +211,35 @@ async function showRevisions(context: vscode.ExtensionContext) {
     )!;
 
     const actions = [
-      "new",
-      "edit",
-      "bookmark set",
-      "bookmark push",
-      "bookmark delete",
-      "describe",
-      "squash",
-      "abandon",
-      "After",
-      "before",
-      "diff",
+      { label: "n", description: "new" },
+      { label: "e", description: "edit" },
+      { label: "b", description: "bookmark set" },
+      { label: "b", description: "bookmark push" },
+      { label: "b", description: "bookmark delete" },
+      { label: "d", description: "describe" },
+      { label: "s", description: "squash" },
+      { label: "a", description: "abandon" },
+      { label: "A", description: "After" },
+      { label: "B", description: "before" },
+      { label: "D", description: "diff" },
     ];
-    const action = await vscode.window.showQuickPick(actions);
-    if (action) {
-      const completedScreens = await handleRevisionSelection(
-        action,
-        jj,
-        chosenRevisionLog
-      );
-      if (completedScreens) {
-        return showRevisions(context);
+    const actionQp = vscode.window.createQuickPick<vscode.QuickPickItem>();
+    actionQp.items = actions;
+    actionQp.onDidChangeValue(async (e) => {
+      const action = actions.filter((x) => x.label === e)[0];
+      actionQp.hide();
+      if (action) {
+        const completedScreens = await handleRevisionSelection(
+          action.description!,
+          jj,
+          chosenRevisionLog
+        );
+        if (completedScreens) {
+          return showRevisions(context);
+        }
       }
-    }
+    });
+    actionQp.show();
   }
 }
 
