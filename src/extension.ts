@@ -23,97 +23,6 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   context.subscriptions.push(monoTest);
-
-  const demoChangesQuickPick = vscode.commands.registerCommand(
-    "jjq.demoRepoTest",
-    async () => {
-      const rawItems = [
-        [Mono.dot, Mono.w, "p"],
-        [Mono.vertical],
-        [Mono.vertical, Mono.w, Mono.hollowDot, Mono.w, "s"],
-        [Mono.train3, Mono.horizontal, Mono.train4],
-        [Mono.vertical, Mono.w, Mono.hollowDot, Mono.w, "w"],
-        [Mono.vertical, Mono.w, Mono.vertical],
-        [
-          Mono.vertical,
-          Mono.w,
-          Mono.vertical,
-          Mono.w,
-          Mono.hollowDot,
-          Mono.w,
-          "l",
-        ],
-        [Mono.vertical, Mono.w, Mono.vertical, Mono.w, Mono.vertical],
-        [
-          Mono.vertical,
-          Mono.w,
-          Mono.vertical,
-          Mono.w,
-          Mono.hollowDot,
-          Mono.w,
-          "o",
-        ],
-        [
-          Mono.vertical,
-          Mono.w,
-          Mono.train3,
-          Mono.horizontal,
-          Mono.cornerBottomRight,
-        ],
-        [
-          Mono.vertical,
-          Mono.w,
-          Mono.vertical,
-          Mono.w,
-          Mono.hollowDot,
-          Mono.w,
-          "u",
-        ],
-        [
-          Mono.vertical,
-          Mono.horizontal,
-          Mono.horizontal,
-          Mono.horizontal,
-          Mono.cornerBottomRight,
-        ],
-        [Mono.hollowDot, Mono.w, Mono.vertical, Mono.w, "k"],
-        [Mono.train3, Mono.horizontal, Mono.cornerBottomRight],
-        [Mono.hollowDot, Mono.w, "t"],
-      ];
-      const stringJoin = (xs: string[]) => {
-        let ans = "";
-        for (const x of xs) {
-          ans = ans + x;
-        }
-        return ans;
-      };
-
-      const alphabetSet = new Set("abcdefghijklmnopqrstuvwxyz".split(""));
-      const items = rawItems.map((m) => {
-        const description = alphabetSet.has(m[m.length - 1])
-          ? "some details about it"
-          : undefined;
-        return {
-          label: stringJoin(m),
-          description,
-        };
-      });
-
-      const detailedItems = [];
-      for (let i = 0; i + 1 < items.length; i += 2) {
-        detailedItems.push({
-          label: items[i].label,
-          description: items[i].description,
-          detail: items[i + 1].label,
-        });
-      }
-      await vscode.window.showQuickPick(detailedItems, {
-        placeHolder: "Select a change",
-      });
-    }
-  );
-
-  context.subscriptions.push(demoChangesQuickPick);
   /* todos 
   - write logs to the extension log destination
   - add a commit hash/message bar at the very bottom
@@ -141,14 +50,26 @@ export function activate(context: vscode.ExtensionContext) {
   );
   context.subscriptions.push(setRepository);
 
+  const changesCommandId = "jjq.changes";
   const changesQuickPick = vscode.commands.registerCommand(
-    "jjq.changes",
+    changesCommandId,
     async () => {
       await showRevisions(context);
     }
   );
 
   context.subscriptions.push(changesQuickPick);
+
+  const statusBar = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Left,
+    100
+  );
+  statusBar.command = changesCommandId;
+  context.subscriptions.push(statusBar);
+
+  // update status bar item once at start
+  statusBar.text = "test one two three four";
+  statusBar.show();
 }
 
 async function showRevisions(context: vscode.ExtensionContext) {
@@ -159,12 +80,17 @@ async function showRevisions(context: vscode.ExtensionContext) {
   }
   const jj = new JJ(repoRoot);
   let currentHead = (await jj.log("@"))[0].changeId;
-  let ungraphedLogs = await jj.log();
+  const prefixes = await scrapePrefixes(jj);
+
+  const revisionsToPull = prefixes
+    .filter((x) => !x.isPrefixOnlyLine)
+    .map((c) => c.changeId)
+    .join("|");
+  let ungraphedLogs = await jj.log(revisionsToPull);
   const changeNodes = ungraphedLogs.map((x) => ({
     ...x,
     isHead: x.changeId === currentHead,
   }));
-  const prefixes = await scrapePrefixes(new Set(changeNodes), jj);
   const itemFullData: ((Change & ChangePrefixes) | PrefixOnly)[] = prefixes.map(
     (p) => {
       if (p.isPrefixOnlyLine === true) {
@@ -183,7 +109,7 @@ async function showRevisions(context: vscode.ExtensionContext) {
   const quickPickLabelToRevision: { [key: string]: string } = {};
   const items: vscode.QuickPickItem[] = [];
   const headItem = createQuickPickLogItem(headLog!);
-  const headItemLabel = "===> @ " + headLog!.changeId;
+  const headItemLabel = "===> @" + headLog!.changeId;
   items.push({
     ...headItem,
     label: headItemLabel,

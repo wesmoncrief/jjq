@@ -50,7 +50,7 @@ export class JJ {
     return await execArgs(args, this.rootLocation);
   }
 
-  public async log(revisions?: string): Promise<Change[]> {
+  public async log(revisions?: string, limit?: number): Promise<Change[]> {
     /*
 the default log template is 'present(@) | ancestors(immutable_heads().., 2) | present(trunk())
 log search language spec: jj help -k revsets
@@ -59,16 +59,16 @@ log search language spec: jj help -k revsets
     const template = `'${Object.values(changeTemplate).join(
       `++ "${separator}" ++`
     )} ++ "${endEntry}"'`;
-    const revsetArgs = revisions ? ["-r", revisions] : [];
+    const revsetArgs = revisions ? ["-r", `"${revisions}"`] : [];
+    const limits = limit ? ["--limit", limit.toString()] : [];
     const { stdout } = await execArgs(
       [
         "log",
         ...revsetArgs,
         "--template",
         template,
+        ...limits,
         "--no-graph",
-        "--limit",
-        LOG_LIMIT.toString(),
       ],
       this.rootLocation
     );

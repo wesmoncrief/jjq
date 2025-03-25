@@ -1,34 +1,36 @@
-import { ChangeNode, ChangePrefixes, PrefixOnly } from "./graph";
+import { ChangePrefixes, PrefixOnly } from "./graph";
 import { JJ } from "./jj";
 import { MONO_MAP } from "./mono";
 
+const alphabet = "abcdefghijklmnopqrstuvwxyz";
+if (alphabet.length != 26) {
+  throw new Error("oop");
+}
+const alphabetSet = new Set();
+for (let i = 0; i < 26; ++i) {
+  alphabetSet.add(alphabet[i]);
+}
+
 export async function scrapePrefixes(
-  changes: Set<ChangeNode>,
   jj: JJ
 ): Promise<(ChangePrefixes | PrefixOnly)[]> {
-  const revisions = new Array(...changes).map((c) => c.changeId).join("|");
   const template = `'change_id.shortest() ++ "\n\n"'`;
   // debug query:
-  // jj log --revisions "rt|qx|mn|ln|z|wz|lm|s|qqlu|qy|kl|kx|wv|qn|vl|vl" --template 'change_id.short() ++ "\n\n"' --no-pager
-  const { stdout } = await jj.exec([
-    "log",
-    "--revisions",
-    `"${revisions}"`,
-    "--template",
-    template,
-  ]);
+  const { stdout } = await jj.exec(["log", "--template", template]);
   const givenLines = stdout.split("\n");
   givenLines.pop();
   const prefixes = new Array<ChangePrefixes | PrefixOnly>();
   const changeIds = new Set<string>();
-  changes.forEach((c) => changeIds.add(c.changeId));
+
   const doesLineHaveAChangeId = (line: string): string | null => {
     const spl = line.split(" ");
-    const changeId = spl[spl.length - 1];
-    if (changeIds.has(changeId)) {
-      return changeId;
+    const lastSplit = spl[spl.length - 1];
+    for (let i = 0; i < lastSplit.length; ++i) {
+      if (!alphabetSet.has(lastSplit[i])) {
+        return null;
+      }
     }
-    return null;
+    return lastSplit;
   };
   for (let i = 0; i < givenLines.length; ++i) {
     const line = givenLines[i];
