@@ -51,14 +51,6 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(setRepository);
 
   const changesCommandId = "jjq.changes";
-  const changesQuickPick = vscode.commands.registerCommand(
-    changesCommandId,
-    async () => {
-      await showRevisions(context);
-    }
-  );
-
-  context.subscriptions.push(changesQuickPick);
 
   const statusBar = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Left,
@@ -70,6 +62,35 @@ export function activate(context: vscode.ExtensionContext) {
   // update status bar item once at start
   statusBar.text = "test one two three four";
   statusBar.show();
+  const changesQuickPick = vscode.commands.registerCommand(
+    changesCommandId,
+    async () => {
+      await setStatusBar(context, statusBar);
+      await showRevisions(context);
+      await setStatusBar(context, statusBar);
+    }
+  );
+
+  setStatusBar(context, statusBar);
+  context.subscriptions.push(changesQuickPick);
+}
+
+async function setStatusBar(
+  context: vscode.ExtensionContext,
+  statusBar: vscode.StatusBarItem
+) {
+  const repoRoot = await getRepositoryRoot(context);
+  if (!repoRoot) {
+    vscode.window.showErrorMessage("Could not load repository root location");
+    return;
+  }
+  const jj = new JJ(repoRoot);
+  const currentHead = (await jj.log("@"))[0];
+  const bookmark = currentHead.localBookmarks[0];
+  const statusBarText = `${currentHead.changeId} ${
+    bookmark ?? currentHead.changeMessage
+  }`;
+  statusBar.text = statusBarText;
 }
 
 async function showRevisions(context: vscode.ExtensionContext) {
