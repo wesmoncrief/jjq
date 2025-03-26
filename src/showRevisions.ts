@@ -301,11 +301,7 @@ export function createQuickPickPrefixOnlyItem(
 export function createQuickPickLogItem(
   l: Change & ChangePrefixes
 ): vscode.QuickPickItem {
-  const emptyNotice = l.isEmpty ? "(empty) " : "";
-  const changeMessage =
-    l.changeMessage === "" ? "(no description set)" : l.changeMessage;
-  const conflictNotice = l.conflict ? " (conflicted) " : "";
-  const description = conflictNotice + emptyNotice + changeMessage;
+  const description = generateFriendlyNames(l, 100).description;
   const bookmarks = [
     ...l.localBookmarks,
     ...l.remoteBookmarks.map((b) => b + "@origin"),
@@ -315,4 +311,22 @@ export function createQuickPickLogItem(
     description: description,
     detail: l.lineBelow + Mono.w + Mono.w + bookmarks,
   };
+}
+
+export function generateFriendlyNames(
+  change: Change,
+  descriptionMaxLength: number
+): {
+  changeId: string;
+  description: string;
+} {
+  const emptyNotice = change.isEmpty ? "(empty)" : "";
+  const changeMessage =
+    change.changeMessage === "" ? "(no description set)" : change.changeMessage;
+  const conflictNotice = change.conflict ? "(conflicted)" : "";
+  let description = [conflictNotice, emptyNotice, changeMessage].join(" ");
+  if (description.length > descriptionMaxLength) {
+    description = description.substring(0, descriptionMaxLength) + "...";
+  }
+  return { changeId: change.changeId, description };
 }

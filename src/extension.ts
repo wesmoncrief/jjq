@@ -5,7 +5,7 @@ import { JJ } from "./jj";
 import { Mono } from "./mono";
 import { clearRepositoryRoot, getRepositoryRoot } from "./repositoryFinder";
 import { JJFileSystemProvider } from "./jjFileSystem";
-import { revisionsUI } from "./showRevisions";
+import { generateFriendlyNames, revisionsUI } from "./showRevisions";
 
 let _extensionContext: vscode.ExtensionContext;
 
@@ -26,7 +26,7 @@ let _extensionContext: vscode.ExtensionContext;
   - don't re-build the graph when just changing the 'edit' - a bit nicer b/c the rebuild can be jarring if a lot change
   - support 'diverges from remote' type bookmark conflict?
   */
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
   _extensionContext = context;
   const monoTest = vscode.commands.registerCommand("jjq.monoTest", async () => {
     const items = Object.values(Mono).map((c) => {
@@ -56,7 +56,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   const statusBar = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Left,
-    100
+    10000000
   );
   statusBar.command = changesCommandId;
   context.subscriptions.push(statusBar);
@@ -73,7 +73,7 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
-  setStatusBar(context, statusBar);
+  await setStatusBar(context, statusBar);
   context.subscriptions.push(changesQuickPick);
 
   const jjFileSystemProvider = new JJFileSystemProvider(context);
@@ -83,6 +83,7 @@ export function activate(context: vscode.ExtensionContext) {
       jjFileSystemProvider
     )
   );
+  
 }
 
 async function setStatusBar(
@@ -96,10 +97,7 @@ async function setStatusBar(
   }
   const jj = new JJ(repoRoot);
   const currentHead = (await jj.log("@"))[0];
-  const bookmark = currentHead.localBookmarks[0];
-  const statusBarText = `${currentHead.changeId} ${
-    bookmark ?? currentHead.changeMessage
-  }`;
+  const statusBarText = currentHead.changeId + ": " + generateFriendlyNames(currentHead, 60).description;
   statusBar.text = statusBarText;
 }
 
