@@ -110,6 +110,13 @@ log search language spec: jj help -k revsets
     return changes;
   }
 
+  async showFile(revision: string, file: string): Promise<ExecResult> {
+    return await execArgs(
+      ["file", "show", "-r", revision, file],
+      this.rootLocation
+    );
+  }
+
   async newChange(r: string): Promise<ExecResult> {
     return await execArgs(["new", r], this.rootLocation);
   }
