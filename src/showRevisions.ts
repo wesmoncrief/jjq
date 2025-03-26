@@ -215,25 +215,30 @@ export async function handleRevisionAction(
       return true;
     }
     case "diff": {
-      // Get the current working directory files
-      const file = "README.md";
+      const files = await jj.getFilesChangedAtRevision(
+        chosenRevisionLog.changeId
+      );
+      const uris = [];
+      for (const file of files) {
+        const currentUri = vscode.Uri.file(`${jj.rootLocation}/${file}`);
 
-      const currentUri = vscode.Uri.file(`${jj.rootLocation}/${file}`);
-
-      // Create a URI for the selected revision's version using the revisionId
-      const revisionUri = currentUri.with({
-        scheme: "jj",
-        query: chosenRevisionLog.changeId,
-      });
-
+        const current = currentUri.with({
+          scheme: "jj",
+          query: chosenRevisionLog.changeId,
+        });
+        const older = currentUri.with({
+          scheme: "jj",
+          query: chosenRevisionLog.changeId + "-",
+        });
+        uris.push([currentUri, older, current]);
+      }
       await vscode.commands.executeCommand(
-        "vscode.diff",
-        revisionUri,
-        currentUri,
-        `this is my changes`
+        "vscode.changes",
+        `Changes in ${chosenRevisionLog.changeId} - ${chosenRevisionLog.changeMessage}`,
+        uris
       );
 
-      return false; // Don't reshow the revision selector
+      return false;
     }
     case "bookmarks": {
       return await handleBookmarkRevisionAction(jj, chosenRevisionLog);

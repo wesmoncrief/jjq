@@ -117,6 +117,16 @@ log search language spec: jj help -k revsets
     );
   }
 
+  async getFilesChangedAtRevision(revision: string): Promise<string[]> {
+    const { stdout } = await execArgs(
+      ["diff", "-r", revision, "--name-only"],
+      this.rootLocation
+    );
+    const result = stdout.split("\n");
+    result.pop(); // empty string entry
+    return result;
+  }
+
   async newChange(r: string): Promise<ExecResult> {
     return await execArgs(["new", r], this.rootLocation);
   }
