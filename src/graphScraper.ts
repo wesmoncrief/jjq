@@ -3,7 +3,7 @@ import { JJ } from "./jj";
 import { MONO_MAP } from "./mono";
 
 const alphabet = "abcdefghijklmnopqrstuvwxyz";
-if (alphabet.length != 26) {
+if (alphabet.length !== 26) {
   throw new Error("oop");
 }
 const alphabetSet = new Set();

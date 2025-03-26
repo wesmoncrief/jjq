@@ -6,24 +6,13 @@ import { Mono } from "./mono";
 import { ChangePrefixes, PrefixOnly } from "./graph";
 import { clearRepositoryRoot, getRepositoryRoot } from "./repositoryFinder";
 import { showMessageWithTimeout } from "./showMessageWithTimeout";
-import { scrapePrefixes } from "./scrape_graph";
+import { JJFileSystemProvider } from "./jjFileSystem";
+import { revisionsUI } from "./showRevisions";
+import { showQuickerPick } from "./showQuickerPick";
 
-export function activate(context: vscode.ExtensionContext) {
-  const monoTest = vscode.commands.registerCommand("jjq.monoTest", async () => {
-    const items = Object.values(Mono).map((c) => {
-      return {
-        label: c.repeat(10) + "x",
-        description: c.repeat(10) + "x",
-        detail: c.repeat(10) + "x",
-      };
-    });
-    await vscode.window.showQuickPick(items, {
-      placeHolder: "Select a change",
-    });
-  });
+let _extensionContext: vscode.ExtensionContext;
 
-  context.subscriptions.push(monoTest);
-  /* todos 
+/* todos 
   - write logs to the extension log destination
   - add a commit hash/message bar at the very bottom
   - support for opening pull requests
@@ -40,6 +29,22 @@ export function activate(context: vscode.ExtensionContext) {
   - don't re-build the graph when just changing the 'edit' - a bit nicer b/c the rebuild can be jarring if a lot change
   - support 'diverges from remote' type bookmark conflict?
   */
+export function activate(context: vscode.ExtensionContext) {
+  _extensionContext = context;
+  const monoTest = vscode.commands.registerCommand("jjq.monoTest", async () => {
+    const items = Object.values(Mono).map((c) => {
+      return {
+        label: c.repeat(10) + "x",
+        description: c.repeat(10) + "x",
+        detail: c.repeat(10) + "x",
+      };
+    });
+    await vscode.window.showQuickPick(items, {
+      placeHolder: "Select a change",
+    });
+  });
+
+  context.subscriptions.push(monoTest);
 
   const setRepository = vscode.commands.registerCommand(
     "jjq.setRepository",
@@ -66,13 +71,21 @@ export function activate(context: vscode.ExtensionContext) {
     changesCommandId,
     async () => {
       await setStatusBar(context, statusBar);
-      await showRevisions(context);
+      await revisionsUI(context);
       await setStatusBar(context, statusBar);
     }
   );
 
   setStatusBar(context, statusBar);
   context.subscriptions.push(changesQuickPick);
+
+  const jjFileSystemProvider = new JJFileSystemProvider(context);
+  context.subscriptions.push(
+    vscode.workspace.registerTextDocumentContentProvider(
+      "jj",
+      jjFileSystemProvider
+    )
+  );
 }
 
 async function setStatusBar(
@@ -91,125 +104,6 @@ async function setStatusBar(
     bookmark ?? currentHead.changeMessage
   }`;
   statusBar.text = statusBarText;
-}
-
-async function showRevisions(context: vscode.ExtensionContext) {
-  const repoRoot = await getRepositoryRoot(context);
-  if (!repoRoot) {
-    vscode.window.showErrorMessage("Could not load repository root location");
-    return;
-  }
-  const jj = new JJ(repoRoot);
-  let currentHead = (await jj.log("@"))[0].changeId;
-  const prefixes = await scrapePrefixes(jj);
-
-  const revisionsToPull = prefixes
-    .filter((x) => !x.isPrefixOnlyLine)
-    .map((c) => c.changeId)
-    .join("|");
-  let ungraphedLogs = await jj.log(revisionsToPull);
-  const changeNodes = ungraphedLogs.map((x) => ({
-    ...x,
-    isHead: x.changeId === currentHead,
-  }));
-  const itemFullData: ((Change & ChangePrefixes) | PrefixOnly)[] = prefixes.map(
-    (p) => {
-      if (p.isPrefixOnlyLine === true) {
-        return p;
-      }
-      return {
-        ...p,
-        ...changeNodes.find((x) => x.changeId === p.changeId)!,
-      };
-    }
-  );
-  const headLog = itemFullData.find(
-    (x) => "changeId" in x && x.changeId === currentHead
-  ) as Change & ChangePrefixes;
-
-  const quickPickLabelToRevision: { [key: string]: string } = {};
-  const items: vscode.QuickPickItem[] = [];
-  const headItem = createQuickPickLogItem(headLog!);
-  const headItemLabel = "===> @" + headLog!.changeId;
-  items.push({
-    ...headItem,
-    label: headItemLabel,
-    detail: undefined,
-  });
-  quickPickLabelToRevision[headItemLabel] = headLog?.changeId!;
-  items.push({ label: "", kind: vscode.QuickPickItemKind.Separator });
-  for (const l of itemFullData) {
-    if (l.isPrefixOnlyLine) {
-      items.push(createQuickPickPrefixOnlyItem(l));
-    } else {
-      const qpi = createQuickPickLogItem(l);
-      items.push(qpi);
-      quickPickLabelToRevision[qpi.label] = l.changeId;
-    }
-  }
-
-  const selection = await vscode.window.showQuickPick(items, {
-    placeHolder: "Select a revision",
-  });
-
-  if (selection) {
-    const chosenRevisionId = quickPickLabelToRevision[selection.label];
-    const chosenRevisionLog = changeNodes.find(
-      (x) => x.changeId === chosenRevisionId
-    )!;
-
-    const actions = [
-      { label: "n", description: "new" },
-      { label: "e", description: "edit" },
-      { label: "b", description: "bookmarks" },
-      { label: "d", description: "describe" },
-      { label: "s", description: "squash" },
-      { label: "a", description: "abandon" },
-      { label: "A", description: "After" },
-      { label: "B", description: "before" },
-      { label: "D", description: "diff" },
-    ];
-
-    const action = await showQuickerPick(actions);
-    if (action) {
-      const completedScreens = await handleRevisionAction(
-        action.description!,
-        jj,
-        chosenRevisionLog
-      );
-      if (completedScreens) {
-        return showRevisions(context);
-      }
-    }
-  }
-}
-
-function showQuickerPick(
-  items: vscode.QuickPickItem[],
-  opts?: {
-    placeholder?: string;
-    title?: string;
-  }
-): Promise<vscode.QuickPickItem | undefined> {
-  const qp = vscode.window.createQuickPick<vscode.QuickPickItem>();
-  qp.items = items;
-  qp.title = opts?.title;
-  qp.placeholder = opts?.placeholder;
-  const result: Promise<vscode.QuickPickItem> = new Promise(
-    (resolve, reject) => {
-      qp.onDidChangeValue(async (e) => {
-        const selection = items.filter((x) => x.label === e)[0];
-        qp.hide();
-        resolve(selection);
-      });
-      qp.onDidAccept((i) => {
-        qp.hide();
-        resolve(qp.selectedItems[0]);
-      });
-    }
-  );
-  qp.show();
-  return result;
 }
 
 async function handleBookmarkRevisionAction(
@@ -317,7 +211,7 @@ async function handleBookmarkRevisionAction(
 }
 
 // returns 'true' if the revision selector should be called again
-async function handleRevisionAction(
+export async function handleRevisionAction(
   action: string,
   jj: JJ,
   chosenRevisionLog: Change
@@ -329,9 +223,25 @@ async function handleRevisionAction(
       return true;
     }
     case "diff": {
-      // vscode.commands.executeCommand("vscode.diff", uri1, uri2)
-      throw new Error("nyi");
-      break;
+      // Get the current working directory files
+      const file = "README.md";
+
+      const currentUri = vscode.Uri.file(`${jj.rootLocation}/${file}`);
+
+      // Create a URI for the selected revision's version using the revisionId
+      const revisionUri = currentUri.with({
+        scheme: "jj",
+        query: chosenRevisionLog.changeId,
+      });
+
+      await vscode.commands.executeCommand(
+        "vscode.diff",
+        revisionUri,
+        currentUri,
+        `this is my changes`
+      );
+
+      return false; // Don't reshow the revision selector
     }
     case "bookmarks": {
       return await handleBookmarkRevisionAction(jj, chosenRevisionLog);
@@ -383,13 +293,15 @@ async function handleDescribe(change: Change, jj: JJ): Promise<boolean> {
   await jj.describe(change.changeId, message);
   return true;
 }
-function createQuickPickPrefixOnlyItem(p: PrefixOnly): vscode.QuickPickItem {
+export function createQuickPickPrefixOnlyItem(
+  p: PrefixOnly
+): vscode.QuickPickItem {
   return {
     label: p.prefix,
   };
 }
 
-function createQuickPickLogItem(
+export function createQuickPickLogItem(
   l: Change & ChangePrefixes
 ): vscode.QuickPickItem {
   const emptyNotice = l.isEmpty ? "(empty) " : "";

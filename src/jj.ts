@@ -62,14 +62,7 @@ log search language spec: jj help -k revsets
     const revsetArgs = revisions ? ["-r", `"${revisions}"`] : [];
     const limits = limit ? ["--limit", limit.toString()] : [];
     const { stdout } = await execArgs(
-      [
-        "log",
-        ...revsetArgs,
-        "--template",
-        template,
-        ...limits,
-        "--no-graph",
-      ],
+      ["log", ...revsetArgs, "--template", template, ...limits, "--no-graph"],
       this.rootLocation
     );
 
@@ -86,8 +79,7 @@ log search language spec: jj help -k revsets
       return change;
     });
     const changes = rawChanges.map((c) => {
-      const remoteBookmarksWithDupes =
-        c.bookmarks.split(inFieldSeparator1);
+      const remoteBookmarksWithDupes = c.bookmarks.split(inFieldSeparator1);
       const allBookmarks = remoteBookmarksWithDupes.map((b) => {
         if (!b) {
           return { name: "", remote: "" };
