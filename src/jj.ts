@@ -52,6 +52,7 @@ export class JJ {
 
   public async log(revisions?: string, limit?: number): Promise<Change[]> {
     /*
+                          = '@ | ancestors(trunk()..(visible_heads() & mine()), 2) | trunk()'
 the default log template is 'present(@) | ancestors(immutable_heads().., 2) | present(trunk())
 log search language spec: jj help -k revsets
 */

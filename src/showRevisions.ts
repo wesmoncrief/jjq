@@ -82,12 +82,18 @@ export async function revisionsUI(context: vscode.ExtensionContext) {
       { label: "A", description: "After" },
       { label: "B", description: "before" },
       { label: "D", description: "diff" },
+      { label: "r", description: "rebase" },
+      {
+        label: "f",
+        description:
+          "forget (`jj abandon -r '::<theRevisionId> ~ immutable()'`",
+      },
     ];
 
     const action = await showQuickerPick(actions);
     if (action) {
       const completedScreens = await handleRevisionAction(
-        action.description!,
+        action.label,
         jj,
         chosenRevisionLog
       );
@@ -209,12 +215,21 @@ export async function handleRevisionAction(
   chosenRevisionLog: Change
 ): Promise<boolean> {
   switch (action) {
-    case "edit": {
+    case "f": {
+      await jj.abandon(
+        "'" + "::" + chosenRevisionLog.changeId + " ~ immutable()" + "'"
+      );
+      showMessageWithTimeout(
+        `Abandoned between revision and immutable ancestor: ${chosenRevisionLog.changeId}`
+      );
+      return true;
+    }
+    case "e": {
       const msg = await jj.edit(chosenRevisionLog.changeId);
       showMessageWithTimeout(msg.stderr);
       return true;
     }
-    case "diff": {
+    case "D": {
       const files = await jj.getFilesChangedAtRevision(
         chosenRevisionLog.changeId
       );
@@ -240,35 +255,47 @@ export async function handleRevisionAction(
 
       return false;
     }
-    case "bookmarks": {
+    case "b": {
       return await handleBookmarkRevisionAction(jj, chosenRevisionLog);
     }
-    case "new": {
+    case "r": {
+      const input = await vscode.window.showInputBox({
+        title: "rebase",
+        value: `-b ${chosenRevisionLog.changeId} -d master@origin`,
+      });
+      if (input === undefined) {
+        return false;
+      }
+      const msg = await jj.exec(["rebase", input]);
+      showMessageWithTimeout(msg.stderr);
+      return true;
+    }
+    case "n": {
       const msg = await jj.newChange(chosenRevisionLog.changeId);
       showMessageWithTimeout(msg.stderr);
       return true;
     }
-    case "before": {
+    case "B": {
       const msg = await jj.before(chosenRevisionLog.changeId);
       showMessageWithTimeout(msg.stderr);
       return true;
     }
-    case "After": {
+    case "A": {
       const msg = await jj.after(chosenRevisionLog.changeId);
       showMessageWithTimeout(msg.stderr);
       return true;
     }
-    case "abandon": {
+    case "a": {
       const msg = await jj.abandon(chosenRevisionLog.changeId);
       showMessageWithTimeout(msg.stderr);
       return true;
     }
-    case "squash": {
+    case "s": {
       const msg = await jj.squash(chosenRevisionLog.changeId);
       showMessageWithTimeout(msg.stderr);
       return true;
     }
-    case "describe": {
+    case "d": {
       return await handleDescribe(chosenRevisionLog, jj);
     }
     case "show": {

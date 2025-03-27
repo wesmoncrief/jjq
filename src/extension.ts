@@ -23,6 +23,7 @@ let _extensionContext: vscode.ExtensionContext;
   - between UI screens, propogate the chosen commit (hash+message) as the title
   - first, pull the log with graph. then, get the detail log for each of those revisions. Gives better results b/c of topological sorting from the with-graph command.
   - maybe a separate screen just for bookmarks?
+  - abandon a full "branch". `jj abandon -r '::<theRevisionId> ~ immutable()' was a good way
   - don't re-build the graph when just changing the 'edit' - a bit nicer b/c the rebuild can be jarring if a lot change
   - support 'diverges from remote' type bookmark conflict?
   */
@@ -83,7 +84,6 @@ export async function activate(context: vscode.ExtensionContext) {
       jjFileSystemProvider
     )
   );
-  
 }
 
 async function setStatusBar(
