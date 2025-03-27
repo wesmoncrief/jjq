@@ -149,9 +149,9 @@ log search language spec: jj help -k revsets
     );
   }
 
-  async deleteBookmark(r: string, bookmark: string): Promise<ExecResult> {
+  async forgetBookmark(r: string, bookmark: string): Promise<ExecResult> {
     return await execArgs(
-      ["bookmark", "delete", `"${bookmark}"`],
+      ["bookmark", "forget", `"${bookmark}"`],
       this.rootLocation
     );
   }

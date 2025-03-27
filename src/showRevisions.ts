@@ -86,7 +86,7 @@ export async function revisionsUI(context: vscode.ExtensionContext) {
       {
         label: "f",
         description:
-          "forget (`jj abandon -r '::<theRevisionId> ~ immutable()'`",
+          "forget - jj abandon -r '::<theRevisionId> ~ immutable()'",
       },
     ];
 
@@ -109,13 +109,13 @@ async function handleBookmarkRevisionAction(
   chosenRevisionLog: Change
 ): Promise<boolean> {
   const actionItem = await showQuickerPick([
-    { label: "d", description: "delete" },
+    { label: "f", description: "forget" },
     { label: "p", description: "push" },
     { label: "s", description: "set" },
   ]);
   const action = actionItem?.description;
   switch (action) {
-    case "delete": {
+    case "forget": {
       const bookmarksAtRevisionLabels = chosenRevisionLog.localBookmarks.map(
         (x) => ({
           label: x,
@@ -127,11 +127,11 @@ async function handleBookmarkRevisionAction(
       if (!bookmarkToDelete) {
         return false;
       }
-      await jj.deleteBookmark(
+      await jj.forgetBookmark(
         chosenRevisionLog.changeId,
         bookmarkToDelete.label
       );
-      showMessageWithTimeout(`Deleted bookmark: ${bookmarkToDelete.label}`);
+      showMessageWithTimeout(`Forgot bookmark: ${bookmarkToDelete.label}`);
       return true;
     }
     case "push": {

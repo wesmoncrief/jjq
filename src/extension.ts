@@ -21,6 +21,7 @@ let _extensionContext: vscode.ExtensionContext;
     - immediately reload the quickpick, and asynchronously let the repo updates happen
     - probably want a single quickPick instance?
   - between UI screens, propogate the chosen commit (hash+message) as the title
+  - change the 'bookmark delete' to 'bookmark forget'
   - first, pull the log with graph. then, get the detail log for each of those revisions. Gives better results b/c of topological sorting from the with-graph command.
   - maybe a separate screen just for bookmarks?
   - abandon a full "branch". `jj abandon -r '::<theRevisionId> ~ immutable()' was a good way
