@@ -6,6 +6,7 @@ import { getRepositoryRoot } from "./repositoryFinder";
 import { scrapePrefixes } from "./graphScraper";
 import { Mono } from "./mono";
 import { showMessageWithTimeout } from "./showMessageWithTimeout";
+import { JJQ_URI_SCHEME } from "./jjFileSystem";
 
 const TITLE_MAX_LENGTH = 50;
 
@@ -67,6 +68,8 @@ export async function revisionsUI(context: vscode.ExtensionContext) {
   const selection = await vscode.window.showQuickPick(items, {
     placeHolder: "Select a revision",
     title: "JJQ",
+    matchOnDescription: true,
+    matchOnDetail: true,
   });
 
   if (selection) {
@@ -279,11 +282,11 @@ export async function handleRevisionAction(
         const currentUri = vscode.Uri.file(`${jj.rootLocation}/${file}`);
 
         const current = currentUri.with({
-          scheme: "jj",
+          scheme: JJQ_URI_SCHEME,
           query: chosenRevisionLog.changeId,
         });
         const older = currentUri.with({
-          scheme: "jj",
+          scheme: JJQ_URI_SCHEME,
           query: chosenRevisionLog.changeId + "-",
         });
         uris.push([currentUri, older, current]);
@@ -349,7 +352,8 @@ export async function handleRevisionAction(
 
 async function handleDescribe(changeLog: Change, jj: JJ): Promise<boolean> {
   const message = await vscode.window.showInputBox({
-    title: generateFriendlyNames(changeLog, TITLE_MAX_LENGTH).changeIdAndDescription,
+    title: generateFriendlyNames(changeLog, TITLE_MAX_LENGTH)
+      .changeIdAndDescription,
     value: changeLog.changeMessage,
     prompt: "Describe revision",
   });

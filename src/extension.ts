@@ -4,14 +4,13 @@ import * as vscode from "vscode";
 import { JJ } from "./jj";
 import { Mono } from "./mono";
 import { clearRepositoryRoot, getRepositoryRoot } from "./repositoryFinder";
-import { JJFileSystemProvider } from "./jjFileSystem";
+import { JJFileSystemProvider, JJQ_URI_SCHEME } from "./jjFileSystem";
 import { generateFriendlyNames, revisionsUI } from "./showRevisions";
 
 let _extensionContext: vscode.ExtensionContext;
 
 /* todos 
   - write logs to the extension log destination
-  - add a commit hash/message bar at the very bottom
   - support for opening pull requests
   - better interaction handling in commit picker
     - on typing a letter, clear our the graph prefixes
@@ -79,7 +78,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const jjFileSystemProvider = new JJFileSystemProvider(context);
   context.subscriptions.push(
     vscode.workspace.registerTextDocumentContentProvider(
-      "jj",
+      JJQ_URI_SCHEME,
       jjFileSystemProvider
     )
   );
@@ -98,7 +97,7 @@ async function setStatusBar(
   const currentHead = (await jj.log("@"))[0];
   const statusBarText = generateFriendlyNames(
     currentHead,
-    60
+    30
   ).changeIdAndDescription;
   statusBar.text = statusBarText;
 }

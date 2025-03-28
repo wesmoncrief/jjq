@@ -2,6 +2,8 @@ import * as vscode from "vscode";
 import { JJ } from "./jj";
 import { getRepositoryRoot } from "./repositoryFinder";
 
+export const JJQ_URI_SCHEME = "jjq";
+
 export class JJFileSystemProvider
   implements vscode.TextDocumentContentProvider
 {
