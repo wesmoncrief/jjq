@@ -7,6 +7,8 @@ import { scrapePrefixes } from "./graphScraper";
 import { Mono } from "./mono";
 import { showMessageWithTimeout } from "./showMessageWithTimeout";
 
+const TITLE_MAX_LENGTH = 50;
+
 export async function revisionsUI(context: vscode.ExtensionContext) {
   const repoRoot = await getRepositoryRoot(context);
   if (!repoRoot) {
@@ -64,6 +66,7 @@ export async function revisionsUI(context: vscode.ExtensionContext) {
 
   const selection = await vscode.window.showQuickPick(items, {
     placeHolder: "Select a revision",
+    title: "JJQ",
   });
 
   if (selection) {
@@ -85,12 +88,17 @@ export async function revisionsUI(context: vscode.ExtensionContext) {
       { label: "r", description: "rebase" },
       {
         label: "f",
-        description:
-          "forget - jj abandon -r '::<theRevisionId> ~ immutable()'",
+        description: "forget - jj abandon -r '::<theRevisionId> ~ immutable()'",
       },
     ];
 
-    const action = await showQuickerPick(actions);
+    const actionSelectTitle = generateFriendlyNames(
+      chosenRevisionLog,
+      TITLE_MAX_LENGTH
+    );
+    const action = await showQuickerPick(actions, {
+      title: actionSelectTitle.changeIdAndDescription,
+    });
     if (action) {
       const completedScreens = await handleRevisionAction(
         action.label,
@@ -108,11 +116,20 @@ async function handleBookmarkRevisionAction(
   jj: JJ,
   chosenRevisionLog: Change
 ): Promise<boolean> {
-  const actionItem = await showQuickerPick([
-    { label: "f", description: "forget" },
-    { label: "p", description: "push" },
-    { label: "s", description: "set" },
-  ]);
+  const qpTitle = generateFriendlyNames(
+    chosenRevisionLog,
+    TITLE_MAX_LENGTH
+  ).changeIdAndDescription;
+  const actionItem = await showQuickerPick(
+    [
+      { label: "f", description: "forget" },
+      { label: "p", description: "push" },
+      { label: "s", description: "set" },
+    ],
+    {
+      title: qpTitle,
+    }
+  );
   const action = actionItem?.description;
   switch (action) {
     case "forget": {
@@ -122,7 +139,11 @@ async function handleBookmarkRevisionAction(
         })
       );
       const bookmarkToDelete = await vscode.window.showQuickPick(
-        bookmarksAtRevisionLabels
+        bookmarksAtRevisionLabels,
+        {
+          title: qpTitle,
+          placeHolder: "Forget bookmark",
+        }
       );
       if (!bookmarkToDelete) {
         return false;
@@ -141,7 +162,11 @@ async function handleBookmarkRevisionAction(
         })
       );
       const bookmark = await vscode.window.showQuickPick(
-        bookmarksAtRevisionLabels
+        bookmarksAtRevisionLabels,
+        {
+          title: qpTitle,
+          placeHolder: "Push bookmark",
+        }
       );
       if (!bookmark) {
         return false;
@@ -159,14 +184,30 @@ async function handleBookmarkRevisionAction(
           label: x,
         })),
       ];
-      const chosenBookmark = await vscode.window.showQuickPick(bookmarkItems);
+      const chosenBookmark = await vscode.window.showQuickPick(bookmarkItems, {
+        title: qpTitle,
+      });
       if (!chosenBookmark) {
         break;
       }
       let bookmark: string | undefined;
       if (chosenBookmark.label === newBookmarkLabel) {
+        function generateRandomString() {
+          const characters = "hijklmnopqrstuvwxyz";
+          let result = "";
+          for (let i = 0; i < 10; i++) {
+            result += characters.charAt(
+              Math.floor(Math.random() * characters.length)
+            );
+          }
+          return result;
+        }
+
+        const suggestedName = "push-" + generateRandomString();
         const newBookmark = await vscode.window.showInputBox({
-          title: "New bookmark",
+          title: qpTitle,
+          value: suggestedName,
+          prompt: "Bookmark name",
         });
         bookmark = newBookmark;
       } else {
@@ -189,7 +230,7 @@ async function handleBookmarkRevisionAction(
           ],
           {
             placeholder: "Push bookmark to origin?",
-            title: "Push bookmark to origin?",
+            title: qpTitle,
           }
         )
       )?.label;
@@ -306,17 +347,19 @@ export async function handleRevisionAction(
   throw new Error("nyi: " + action);
 }
 
-async function handleDescribe(change: Change, jj: JJ): Promise<boolean> {
+async function handleDescribe(changeLog: Change, jj: JJ): Promise<boolean> {
   const message = await vscode.window.showInputBox({
-    title: "Describe revision " + change.changeId,
-    value: change.changeMessage,
+    title: generateFriendlyNames(changeLog, TITLE_MAX_LENGTH).changeIdAndDescription,
+    value: changeLog.changeMessage,
+    prompt: "Describe revision",
   });
   if (message === undefined) {
     return false; // backout
   }
-  await jj.describe(change.changeId, message);
+  await jj.describe(changeLog.changeId, message);
   return true;
 }
+
 export function createQuickPickPrefixOnlyItem(
   p: PrefixOnly
 ): vscode.QuickPickItem {
@@ -346,6 +389,7 @@ export function generateFriendlyNames(
 ): {
   changeId: string;
   description: string;
+  changeIdAndDescription: string;
 } {
   const emptyNotice = change.isEmpty ? "(empty)" : "";
   const changeMessage =
@@ -355,5 +399,9 @@ export function generateFriendlyNames(
   if (description.length > descriptionMaxLength) {
     description = description.substring(0, descriptionMaxLength) + "...";
   }
-  return { changeId: change.changeId, description };
+  return {
+    changeId: change.changeId,
+    description,
+    changeIdAndDescription: change.changeId + ": " + description,
+  };
 }

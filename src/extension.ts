@@ -21,10 +21,8 @@ let _extensionContext: vscode.ExtensionContext;
     - immediately reload the quickpick, and asynchronously let the repo updates happen
     - probably want a single quickPick instance?
   - between UI screens, propogate the chosen commit (hash+message) as the title
-  - change the 'bookmark delete' to 'bookmark forget'
   - first, pull the log with graph. then, get the detail log for each of those revisions. Gives better results b/c of topological sorting from the with-graph command.
   - maybe a separate screen just for bookmarks?
-  - abandon a full "branch". `jj abandon -r '::<theRevisionId> ~ immutable()' was a good way
   - don't re-build the graph when just changing the 'edit' - a bit nicer b/c the rebuild can be jarring if a lot change
   - support 'diverges from remote' type bookmark conflict?
   */
@@ -98,7 +96,10 @@ async function setStatusBar(
   }
   const jj = new JJ(repoRoot);
   const currentHead = (await jj.log("@"))[0];
-  const statusBarText = currentHead.changeId + ": " + generateFriendlyNames(currentHead, 60).description;
+  const statusBarText = generateFriendlyNames(
+    currentHead,
+    60
+  ).changeIdAndDescription;
   statusBar.text = statusBarText;
 }
 
