@@ -17,7 +17,7 @@ export async function revisionsUI(context: vscode.ExtensionContext) {
     return;
   }
   const jj = new JJ(repoRoot);
-  let currentHead = (await jj.log("@"))[0].changeId;
+  let workingCopyChangeId = (await jj.log("@"))[0].changeId;
   const prefixes = await scrapePrefixes(jj);
 
   const revisionsToPull = prefixes
@@ -27,7 +27,7 @@ export async function revisionsUI(context: vscode.ExtensionContext) {
   let ungraphedLogs = await jj.log(revisionsToPull);
   const changeNodes = ungraphedLogs.map((x) => ({
     ...x,
-    isHead: x.changeId === currentHead,
+    isworkingCopy: x.changeId === workingCopyChangeId,
   }));
   const itemFullData: ((Change & ChangePrefixes) | PrefixOnly)[] = prefixes.map(
     (p) => {
@@ -40,20 +40,20 @@ export async function revisionsUI(context: vscode.ExtensionContext) {
       };
     }
   );
-  const headLog = itemFullData.find(
-    (x) => "changeId" in x && x.changeId === currentHead
+  const workingCopyLog = itemFullData.find(
+    (x) => "changeId" in x && x.changeId === workingCopyChangeId
   ) as Change & ChangePrefixes;
 
   const quickPickLabelToRevision: { [key: string]: string } = {};
   const items: vscode.QuickPickItem[] = [];
-  const headItem = createQuickPickLogItem(headLog!);
-  const headItemLabel = "===> @" + headLog!.changeId;
+  const workingCopyItem = createQuickPickLogItem(workingCopyLog!);
+  const workingCopyItemLabel = "===> @" + workingCopyLog!.changeId;
   items.push({
-    ...headItem,
-    label: headItemLabel,
+    ...workingCopyItem,
+    label: workingCopyItemLabel,
     detail: undefined,
   });
-  quickPickLabelToRevision[headItemLabel] = headLog?.changeId!;
+  quickPickLabelToRevision[workingCopyItemLabel] = workingCopyLog?.changeId!;
   items.push({ label: "", kind: vscode.QuickPickItemKind.Separator });
   for (const l of itemFullData) {
     if (l.isPrefixOnlyLine) {
@@ -107,7 +107,7 @@ export async function revisionsUI(context: vscode.ExtensionContext) {
         action.label,
         jj,
         chosenRevisionLog,
-        headLog
+        workingCopyLog
       );
       if (completedScreens) {
         return revisionsUI(context);
@@ -258,7 +258,7 @@ export async function handleRevisionAction(
   action: string,
   jj: JJ,
   chosenRevisionLog: Change,
-  currentHead: Change
+  workingCopy: Change
 ): Promise<boolean> {
   switch (action) {
     case "f": {
@@ -276,7 +276,7 @@ export async function handleRevisionAction(
       return true;
     }
     case "D": {
-      await handleDiff(jj, chosenRevisionLog, currentHead);
+      await handleDiff(jj, chosenRevisionLog, workingCopy);
       return false;
     }
     case "b": {
@@ -333,11 +333,11 @@ export async function handleRevisionAction(
 async function handleDiff(
   jj: JJ,
   chosenRevisionLog: Change,
-  currentHead: Change
+  workingCopy: Change
 ) {
   const diffOptions = [
-    { label: "p", description: "Parent" },
-    { label: "@", description: "Current head" },
+    { label: "p", description: "parent" },
+    { label: "@", description: "working copy" },
     { label: "c", description: "custom" },
   ];
   const qpTitle = generateFriendlyNames(
@@ -350,7 +350,7 @@ async function handleDiff(
   }
   let diffFrom: string;
   let diffTo: string =
-    chosenRevisionLog.changeId === currentHead.changeId
+    chosenRevisionLog.changeId === workingCopy.changeId
       ? "@"
       : chosenRevisionLog.changeId;
   if (qp.label === "p") {
