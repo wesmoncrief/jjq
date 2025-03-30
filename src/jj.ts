@@ -51,11 +51,8 @@ export class JJ {
   }
 
   public async log(revisions?: string, limit?: number): Promise<Change[]> {
-    /*
-                          = '@ | ancestors(trunk()..(visible_heads() & mine()), 2) | trunk()'
-the default log template is 'present(@) | ancestors(immutable_heads().., 2) | present(trunk())
-log search language spec: jj help -k revsets
-*/
+    // the default log template is 'present(@) | ancestors(immutable_heads().., 2) | present(trunk())
+    // log search language spec: jj help -k revsets
     const separator = "jjqseparator";
     const template = `'${Object.values(changeTemplate).join(
       `++ "${separator}" ++`
@@ -80,8 +77,8 @@ log search language spec: jj help -k revsets
       return change;
     });
     const changes = rawChanges.map((c) => {
-      const remoteBookmarksWithDupes = c.bookmarks.split(inFieldSeparator1);
-      const allBookmarks = remoteBookmarksWithDupes.map((b) => {
+      const bookmarksWithDupes = c.bookmarks.split(inFieldSeparator1);
+      const allBookmarks = bookmarksWithDupes.map((b) => {
         if (!b) {
           return { name: "", remote: "" };
         }
@@ -89,12 +86,15 @@ log search language spec: jj help -k revsets
         return { name, remote };
       });
 
-      const localBookmarks = allBookmarks
+      const localBookmarksWithDupes = allBookmarks
         .filter((x) => x.remote === "git")
         .map((x) => x.name);
-      const remoteBookmarks = allBookmarks
+      const remoteBookmarksWithDupes = allBookmarks
         .filter((x) => x.remote === "origin")
         .map((x) => x.name);
+
+      const localBookmarks = Array.from(new Set(localBookmarksWithDupes));
+      const remoteBookmarks = Array.from(new Set(remoteBookmarksWithDupes));
 
       const change: Change = {
         changeId: c.changeId,

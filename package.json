@@ -18,7 +18,7 @@
     "commands": [
       {
         "command": "jjq.changes",
-        "title": "Changes",
+        "title": "Quick view log",
         "category": "jjq"
       },
       {

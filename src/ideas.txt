@@ -1,5 +1,14 @@
-look at what whichKey has done - https://github.com/VSpaceCode/vscode-which-key/blob/master/src/menu/baseWhichKeyMenu.ts#L36
-
-override text input to not filter anything, and just move the highlighted line?
- 
-
+- write logs to the extension log destination
+- support for opening pull requests
+- better interaction handling in commit picker
+- on typing a letter, clear our the graph prefixes
+- short/full commit distinction
+- better sorting (it should not do fuzzy searching, but it does)
+- allow searching by commit name/bookmark
+- immediately reload the quickpick, and asynchronously let the repo updates happen
+- probably want a single quickPick instance?
+- maybe a separate screen just for bookmarks?
+- don't re-build the graph when just changing the 'edit' - a bit nicer b/c the rebuild can be jarring if a lot change
+- support 'diverges from remote' type bookmark conflict?
+- override text input to not filter anything, and just move the highlighted line?
+- look at what whichKey has done - https://github.com/VSpaceCode/vscode-which-key/blob/master/src/menu/baseWhichKeyMenu.ts#L36
