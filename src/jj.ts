@@ -1,8 +1,6 @@
 import ChildProcess from "child_process";
 import { promisify } from "util";
 
-const LOG_LIMIT = 20;
-
 export interface Change {
   changeId: string;
   changeMessage: string;
@@ -27,6 +25,7 @@ interface RawChange {
 
 const inFieldSeparator1 = "_jjq_";
 const inFieldSeparator2 = "_jjq2_";
+
 // doesn't really inherit logically, but should match types
 const changeTemplate: RawChange = {
   changeId: "change_id.shortest()",
