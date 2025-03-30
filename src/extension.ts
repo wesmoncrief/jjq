@@ -19,8 +19,6 @@ let _extensionContext: vscode.ExtensionContext;
     - allow searching by commit name/bookmark
     - immediately reload the quickpick, and asynchronously let the repo updates happen
     - probably want a single quickPick instance?
-  - between UI screens, propogate the chosen commit (hash+message) as the title
-  - first, pull the log with graph. then, get the detail log for each of those revisions. Gives better results b/c of topological sorting from the with-graph command.
   - maybe a separate screen just for bookmarks?
   - don't re-build the graph when just changing the 'edit' - a bit nicer b/c the rebuild can be jarring if a lot change
   - support 'diverges from remote' type bookmark conflict?

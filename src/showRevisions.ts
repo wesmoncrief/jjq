@@ -106,7 +106,8 @@ export async function revisionsUI(context: vscode.ExtensionContext) {
       const completedScreens = await handleRevisionAction(
         action.label,
         jj,
-        chosenRevisionLog
+        chosenRevisionLog,
+        headLog
       );
       if (completedScreens) {
         return revisionsUI(context);
@@ -251,12 +252,13 @@ async function handleBookmarkRevisionAction(
   }
   return false;
 }
-// returns 'true' if the revision selector should be called again
 
+// returns 'true' if the revision selector should be called again
 export async function handleRevisionAction(
   action: string,
   jj: JJ,
-  chosenRevisionLog: Change
+  chosenRevisionLog: Change,
+  currentHead: Change
 ): Promise<boolean> {
   switch (action) {
     case "f": {
@@ -274,29 +276,7 @@ export async function handleRevisionAction(
       return true;
     }
     case "D": {
-      const files = await jj.getFilesChangedAtRevision(
-        chosenRevisionLog.changeId
-      );
-      const uris = [];
-      for (const file of files) {
-        const currentUri = vscode.Uri.file(`${jj.rootLocation}/${file}`);
-
-        const current = currentUri.with({
-          scheme: JJQ_URI_SCHEME,
-          query: chosenRevisionLog.changeId,
-        });
-        const older = currentUri.with({
-          scheme: JJQ_URI_SCHEME,
-          query: chosenRevisionLog.changeId + "-",
-        });
-        uris.push([currentUri, older, current]);
-      }
-      await vscode.commands.executeCommand(
-        "vscode.changes",
-        `Changes in ${chosenRevisionLog.changeId} - ${chosenRevisionLog.changeMessage}`,
-        uris
-      );
-
+      await handleDiff(jj, chosenRevisionLog, currentHead);
       return false;
     }
     case "b": {
@@ -348,6 +328,77 @@ export async function handleRevisionAction(
     }
   }
   throw new Error("nyi: " + action);
+}
+
+async function handleDiff(
+  jj: JJ,
+  chosenRevisionLog: Change,
+  currentHead: Change
+) {
+  const diffOptions = [
+    { label: "p", description: "Parent" },
+    { label: "@", description: "Current head" },
+    { label: "c", description: "custom" },
+  ];
+  const qpTitle = generateFriendlyNames(
+    chosenRevisionLog,
+    TITLE_MAX_LENGTH
+  ).changeIdAndDescription;
+  const qp = await showQuickerPick(diffOptions, { title: qpTitle });
+  if (!qp) {
+    return;
+  }
+  let diffFrom: string;
+  let diffTo: string =
+    chosenRevisionLog.changeId === currentHead.changeId
+      ? "@"
+      : chosenRevisionLog.changeId;
+  if (qp.label === "p") {
+    diffFrom = chosenRevisionLog.changeId + "-";
+  } else if (qp.label === "@") {
+    diffTo = "@";
+    diffFrom = chosenRevisionLog.changeId;
+  } else if (qp.label === "c") {
+    const input = await vscode.window.showInputBox({
+      title: "Diff revision",
+      prompt: "Diff from ?? to " + chosenRevisionLog.changeId,
+      value: chosenRevisionLog.changeId + "--",
+    });
+    if (!input) {
+      return;
+    }
+    diffFrom = input;
+  } else {
+    return;
+  }
+
+  const files1 = await jj.getFilesChangedAtRevision(diffTo);
+  const files2 = await jj.getFilesChangedAtRevision(diffFrom);
+  const files = Array.from(new Set([...files1, ...files2]));
+  const uris = [];
+  for (const file of files) {
+    const currentUri = vscode.Uri.file(`${jj.rootLocation}/${file}`);
+
+    const current =
+      diffTo === "@"
+        ? currentUri
+        : currentUri.with({
+            scheme: JJQ_URI_SCHEME,
+            query: diffTo,
+          });
+    const older = currentUri.with({
+      scheme: JJQ_URI_SCHEME,
+      query: diffFrom,
+    });
+    uris.push([currentUri, older, current]);
+  }
+  await vscode.commands.executeCommand(
+    "vscode.changes",
+    `Changes from ${diffFrom} to ${diffTo}`,
+    uris
+  );
+
+  return false;
 }
 
 async function handleDescribe(changeLog: Change, jj: JJ): Promise<boolean> {
