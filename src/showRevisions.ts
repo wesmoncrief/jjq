@@ -241,15 +241,18 @@ async function handleBookmarkRevisionAction(
       return true;
     }
     case "t": {
+      const toRev = chosenRevisionLog.isEmpty
+        ? chosenRevisionLog.changeId + "-"
+        : chosenRevisionLog.changeId;
       await jj.exec([
         "bookmark",
         "move",
         "--from",
         `"closest_bookmark(${chosenRevisionLog.changeId})"`,
         "--to",
-        `${chosenRevisionLog.changeId}`,
+        toRev,
       ]);
-      const bookmark = await jj.listBookmarks(chosenRevisionLog.changeId);
+      const bookmark = await jj.listBookmarks(toRev);
       if (bookmark.length !== 1) {
         return false;
       }

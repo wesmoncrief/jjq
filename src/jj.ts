@@ -140,7 +140,7 @@ export class JJ {
     );
     const bookmarks = stdout.split(endEntry);
     bookmarks.pop();
-    return bookmarks;
+    return Array.from(new Set(bookmarks));
   }
   async setBookmark(r: string, bookmark: string): Promise<ExecResult> {
     return await execArgs(
