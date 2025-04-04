@@ -17,9 +17,11 @@ export function showQuickerPick(
       qp.onDidChangeValue(async (e) => {
         const selection = items.filter((x) => x.label === e)[0];
         resolve(selection);
+        qp.hide();
       });
       qp.onDidAccept((i) => {
         resolve(qp.selectedItems[0]);
+        qp.hide();
       });
     }
   );

@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { showQuickerPick } from "./showQuickerPick";
 import { ChangePrefixes, PrefixOnly } from "./graph";
-import { JJ, Change } from "./jj";
+import { JJ, Change, exec } from "./jj";
 import { getRepositoryRoot } from "./repositoryFinder";
 import { scrapePrefixes } from "./graphScraper";
 import { Mono } from "./mono";
@@ -81,6 +81,7 @@ export async function revisionsUI(context: vscode.ExtensionContext) {
     const actions = [
       { label: "n", description: "new" },
       { label: "e", description: "edit" },
+      { label: "c", description: "commit" },
       { label: "b", description: "bookmarks" },
       { label: "d", description: "describe" },
       { label: "s", description: "squash" },
@@ -115,6 +116,54 @@ export async function revisionsUI(context: vscode.ExtensionContext) {
     }
   }
 }
+async function pickNewBookmark(qpTitle: string): Promise<string | null> {
+  function generateRandomString() {
+    const characters = "hijklmnopqrstuvwxyz";
+    let result = "";
+    for (let i = 0; i < 10; i++) {
+      result += characters.charAt(
+        Math.floor(Math.random() * characters.length)
+      );
+    }
+    return result;
+  }
+
+  const suggestedName = "push-" + generateRandomString();
+  const newBookmark = await vscode.window.showInputBox({
+    title: qpTitle,
+    value: suggestedName,
+    prompt: "Bookmark name",
+  });
+  return newBookmark ?? null;
+}
+
+async function pickExistingOrNewBookmark(
+  jj: JJ,
+  qpTitle: string,
+  existingBookmarks: string[]
+): Promise<string | null> {
+  if (existingBookmarks.length === 0) {
+    return await pickNewBookmark(qpTitle);
+  }
+  const newBookmarkLabel = "New Bookmark";
+  const bookmarkItems: vscode.QuickPickItem[] = [
+    { label: newBookmarkLabel },
+    { label: "", kind: vscode.QuickPickItemKind.Separator },
+    ...existingBookmarks.map((x) => ({
+      label: x,
+    })),
+  ];
+  const chosenBookmark = await vscode.window.showQuickPick(bookmarkItems, {
+    title: qpTitle,
+  });
+  if (!chosenBookmark) {
+    return null;
+  }
+  if (chosenBookmark.label === newBookmarkLabel) {
+    return await pickNewBookmark(qpTitle);
+  }
+  return chosenBookmark.label;
+}
 
 async function handleBookmarkRevisionAction(
   jj: JJ,
@@ -126,17 +175,19 @@ async function handleBookmarkRevisionAction(
   ).changeIdAndDescription;
   const actionItem = await showQuickerPick(
     [
-      { label: "f", description: "forget" },
-      { label: "p", description: "push" },
       { label: "s", description: "set" },
+      { label: "t", description: "tug" },
+      { label: "p", description: "push" },
+      { label: "o", description: "open Github PR" },
+      { label: "f", description: "forget" },
     ],
     {
       title: qpTitle,
     }
   );
-  const action = actionItem?.description;
+  const action = actionItem?.label;
   switch (action) {
-    case "forget": {
+    case "f": {
       const bookmarksAtRevisionLabels = chosenRevisionLog.localBookmarks.map(
         (x) => ({
           label: x,
@@ -159,7 +210,34 @@ async function handleBookmarkRevisionAction(
       showMessageWithTimeout(`Forgot bookmark: ${bookmarkToDelete.label}`);
       return true;
     }
-    case "push": {
+    case "t": {
+      await jj.exec([
+        "bookmark",
+        "move",
+        "--from",
+        `"closest_bookmark(${chosenRevisionLog.changeId})"`,
+        "--to",
+        `${chosenRevisionLog.changeId}`,
+      ]);
+      return true;
+    }
+    case "o": {
+      const branch = await pickExistingOrNewBookmark(
+        jj,
+        qpTitle,
+        chosenRevisionLog.localBookmarks
+      );
+      if (!branch) {
+        return false;
+      }
+      await jj.setBookmark(chosenRevisionLog.changeId, branch);
+      await jj.pushBookmark(chosenRevisionLog.changeId, branch);
+      await exec(
+        `cd ${jj.rootLocation} && gh pr create --web --title "${chosenRevisionLog.changeMessage}" --head ${branch}`
+      );
+      return true;
+    }
+    case "p": {
       const bookmarksAtRevisionLabels = chosenRevisionLog.localBookmarks.map(
         (x) => ({
           label: x,
@@ -177,46 +255,15 @@ async function handleBookmarkRevisionAction(
       }
       await jj.pushBookmark(chosenRevisionLog.changeId, bookmark.label);
       showMessageWithTimeout(`Pushed bookmark: ${bookmark.label}`);
+      return true;
     }
-    case "set": {
-      const newBookmarkLabel = "New Bookmark";
-      const existingBookmarks = await jj.listBookmarks();
-      const bookmarkItems: vscode.QuickPickItem[] = [
-        { label: newBookmarkLabel },
-        { label: "", kind: vscode.QuickPickItemKind.Separator },
-        ...existingBookmarks.map((x) => ({
-          label: x,
-        })),
-      ];
-      const chosenBookmark = await vscode.window.showQuickPick(bookmarkItems, {
-        title: qpTitle,
-      });
-      if (!chosenBookmark) {
-        break;
-      }
-      let bookmark: string | undefined;
-      if (chosenBookmark.label === newBookmarkLabel) {
-        function generateRandomString() {
-          const characters = "hijklmnopqrstuvwxyz";
-          let result = "";
-          for (let i = 0; i < 10; i++) {
-            result += characters.charAt(
-              Math.floor(Math.random() * characters.length)
-            );
-          }
-          return result;
-        }
-
-        const suggestedName = "push-" + generateRandomString();
-        const newBookmark = await vscode.window.showInputBox({
-          title: qpTitle,
-          value: suggestedName,
-          prompt: "Bookmark name",
-        });
-        bookmark = newBookmark;
-      } else {
-        bookmark = chosenBookmark.label;
-      }
+    case "s": {
+      const localBookmarks = await jj.listBookmarks();
+      const bookmark = await pickExistingOrNewBookmark(
+        jj,
+        qpTitle,
+        localBookmarks
+      );
       if (!bookmark) {
         // backout
         return false;
@@ -257,35 +304,50 @@ async function handleBookmarkRevisionAction(
 export async function handleRevisionAction(
   action: string,
   jj: JJ,
-  chosenRevisionLog: Change,
+  chosenRevision: Change,
   workingCopy: Change
 ): Promise<boolean> {
   switch (action) {
     case "f": {
       await jj.abandon(
-        "'" + "::" + chosenRevisionLog.changeId + " ~ immutable()" + "'"
+        "'" + "::" + chosenRevision.changeId + " ~ immutable()" + "'"
       );
       showMessageWithTimeout(
-        `Abandoned between revision and immutable ancestor: ${chosenRevisionLog.changeId}`
+        `Abandoned between revision and immutable ancestor: ${chosenRevision.changeId}`
       );
       return true;
     }
     case "e": {
-      const msg = await jj.edit(chosenRevisionLog.changeId);
+      const msg = await jj.edit(chosenRevision.changeId);
       showMessageWithTimeout(msg.stderr);
       return true;
     }
+    case "c": {
+      const message = await vscode.window.showInputBox({
+        title: generateFriendlyNames(chosenRevision, TITLE_MAX_LENGTH)
+          .changeIdAndDescription,
+        value: chosenRevision.changeMessage,
+        prompt: "Describe revision",
+      });
+      if (message === undefined) {
+        return false; 
+      }
+      await jj.describe(chosenRevision.changeId, message);
+      await jj.new(chosenRevision.changeId);
+
+      return true;
+    }
     case "D": {
-      await handleDiff(jj, chosenRevisionLog, workingCopy);
+      await handleDiff(jj, chosenRevision, workingCopy);
       return false;
     }
     case "b": {
-      return await handleBookmarkRevisionAction(jj, chosenRevisionLog);
+      return await handleBookmarkRevisionAction(jj, chosenRevision);
     }
     case "r": {
       const input = await vscode.window.showInputBox({
         title: "rebase",
-        value: `-b ${chosenRevisionLog.changeId} -d master@origin`,
+        value: `-b ${chosenRevision.changeId} -d master@origin`,
       });
       if (input === undefined) {
         return false;
@@ -295,32 +357,32 @@ export async function handleRevisionAction(
       return true;
     }
     case "n": {
-      const msg = await jj.newChange(chosenRevisionLog.changeId);
+      const msg = await jj.new(chosenRevision.changeId);
       showMessageWithTimeout(msg.stderr);
       return true;
     }
     case "B": {
-      const msg = await jj.before(chosenRevisionLog.changeId);
+      const msg = await jj.before(chosenRevision.changeId);
       showMessageWithTimeout(msg.stderr);
       return true;
     }
     case "A": {
-      const msg = await jj.after(chosenRevisionLog.changeId);
+      const msg = await jj.after(chosenRevision.changeId);
       showMessageWithTimeout(msg.stderr);
       return true;
     }
     case "a": {
-      const msg = await jj.abandon(chosenRevisionLog.changeId);
+      const msg = await jj.abandon(chosenRevision.changeId);
       showMessageWithTimeout(msg.stderr);
       return true;
     }
     case "s": {
-      const msg = await jj.squash(chosenRevisionLog.changeId);
+      const msg = await jj.squash(chosenRevision.changeId);
       showMessageWithTimeout(msg.stderr);
       return true;
     }
     case "d": {
-      return await handleDescribe(chosenRevisionLog, jj);
+      return await handleDescribe(chosenRevision, jj);
     }
     case "show": {
       // opens code window with extra details
@@ -372,9 +434,7 @@ async function handleDiff(
     return;
   }
 
-  const files1 = await jj.getFilesChangedAtRevision(diffTo);
-  const files2 = await jj.getFilesChangedAtRevision(diffFrom);
-  const files = Array.from(new Set([...files1, ...files2]));
+  const files = await jj.getFilesChangedBetween(diffFrom, diffTo);
   const uris = [];
   for (const file of files) {
     const currentUri = vscode.Uri.file(`${jj.rootLocation}/${file}`);

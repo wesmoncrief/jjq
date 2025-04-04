@@ -117,9 +117,9 @@ export class JJ {
     );
   }
 
-  async getFilesChangedAtRevision(revision: string): Promise<string[]> {
+  async getFilesChangedBetween(from: string, to: string): Promise<string[]> {
     const { stdout } = await execArgs(
-      ["diff", "-r", revision, "--name-only"],
+      ["diff", "--from", from, "--to", to, "--name-only"],
       this.rootLocation
     );
     const result = stdout.split("\n");
@@ -127,7 +127,7 @@ export class JJ {
     return result;
   }
 
-  async newChange(r: string): Promise<ExecResult> {
+  async new(r: string): Promise<ExecResult> {
     return await execArgs(["new", r], this.rootLocation);
   }
 
@@ -195,7 +195,7 @@ export interface ExecResult {
   stderr: string;
 }
 
-const exec = promisify(ChildProcess.exec);
+export const exec = promisify(ChildProcess.exec);
 const execArgs = (args: string[], cwd: string): Promise<ExecResult> => {
   const cmd = args.join(" ");
   return exec("jj " + cmd, { cwd });
