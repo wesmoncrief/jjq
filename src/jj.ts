@@ -131,10 +131,11 @@ export class JJ {
     return await execArgs(["new", r], this.rootLocation);
   }
 
-  async listBookmarks(): Promise<string[]> {
+  async listBookmarks(r?: string): Promise<string[]> {
     const template = `'name ++ "${endEntry}"'`;
+    const revisionArgs = r ? ["--revisions", r] : [];
     const { stdout } = await execArgs(
-      ["bookmark", "list", "--template", template],
+      ["bookmark", "list", "--template", template, ...revisionArgs],
       this.rootLocation
     );
     const bookmarks = stdout.split(endEntry);

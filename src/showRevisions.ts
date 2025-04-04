@@ -179,7 +179,7 @@ async function offerToPush(
         },
       ],
       {
-        placeholder: "Push bookmark to origin?",
+        placeholder: `Push bookmark ${bookmark} to origin?`,
         title: qpTitle,
       }
     )
@@ -249,7 +249,11 @@ async function handleBookmarkRevisionAction(
         "--to",
         `${chosenRevisionLog.changeId}`,
       ]);
-      return true;
+      const bookmark = await jj.listBookmarks(chosenRevisionLog.changeId);
+      if (bookmark.length !== 1) {
+        return false;
+      }
+      return await offerToPush(jj, bookmark[0], qpTitle);
     }
     case "o": {
       const branch = await pickExistingOrNewBookmark(
