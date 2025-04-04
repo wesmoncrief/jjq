@@ -155,7 +155,7 @@ export class JJ {
     );
   }
 
-  async pushBookmark(r: string, bookmark: string): Promise<ExecResult> {
+  async pushBookmark(bookmark: string): Promise<ExecResult> {
     return await execArgs(
       ["git", "push", "--bookmark", `"${bookmark}"`, "--allow-new"],
       this.rootLocation

@@ -165,6 +165,36 @@ async function pickExistingOrNewBookmark(
   return chosenBookmark.label;
 }
 
+async function offerToPush(
+  jj: JJ,
+  bookmark: string,
+  qpTitle: string
+): Promise<boolean> {
+  const pushBookmark = (
+    await showQuickerPick(
+      [
+        { label: "y" },
+        {
+          label: "n",
+        },
+      ],
+      {
+        placeholder: "Push bookmark to origin?",
+        title: qpTitle,
+      }
+    )
+  )?.label;
+  if (pushBookmark === "y") {
+    await jj.pushBookmark(bookmark);
+    showMessageWithTimeout("Pushed bookmark: " + bookmark);
+    return true;
+  }
+  if (pushBookmark === "n") {
+    return true;
+  }
+  return false;
+}
+
 async function handleBookmarkRevisionAction(
   jj: JJ,
   chosenRevisionLog: Change
@@ -231,7 +261,7 @@ async function handleBookmarkRevisionAction(
         return false;
       }
       await jj.setBookmark(chosenRevisionLog.changeId, branch);
-      await jj.pushBookmark(chosenRevisionLog.changeId, branch);
+      await jj.pushBookmark(branch);
       await exec(
         `cd ${jj.rootLocation} && gh pr create --web --title "${chosenRevisionLog.changeMessage}" --head ${branch}`
       );
@@ -253,7 +283,7 @@ async function handleBookmarkRevisionAction(
       if (!bookmark) {
         return false;
       }
-      await jj.pushBookmark(chosenRevisionLog.changeId, bookmark.label);
+      await jj.pushBookmark(bookmark.label);
       showMessageWithTimeout(`Pushed bookmark: ${bookmark.label}`);
       return true;
     }
@@ -270,31 +300,7 @@ async function handleBookmarkRevisionAction(
       }
       const msg = await jj.setBookmark(chosenRevisionLog.changeId, bookmark);
       showMessageWithTimeout(msg.stderr);
-
-      const pushBookmark = (
-        await showQuickerPick(
-          [
-            { label: "y" },
-            {
-              label: "n",
-            },
-          ],
-          {
-            placeholder: "Push bookmark to origin?",
-            title: qpTitle,
-          }
-        )
-      )?.label;
-      if (pushBookmark === "y") {
-        await jj.pushBookmark(chosenRevisionLog.changeId, bookmark);
-        showMessageWithTimeout("Pushed bookmark: " + bookmark);
-        return true;
-      }
-      if (pushBookmark === "n") {
-        return true;
-      }
-
-      return false;
+      return await offerToPush(jj, bookmark, qpTitle);
     }
   }
   return false;
@@ -330,7 +336,7 @@ export async function handleRevisionAction(
         prompt: "Describe revision",
       });
       if (message === undefined) {
-        return false; 
+        return false;
       }
       await jj.describe(chosenRevision.changeId, message);
       await jj.new(chosenRevision.changeId);
