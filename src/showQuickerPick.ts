@@ -23,6 +23,7 @@ export function showQuickerPick(
         resolve(qp.selectedItems[0]);
         qp.hide();
       });
+      // todo handle reject to stop mem leak?
     }
   );
   qp.show();

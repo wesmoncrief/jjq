@@ -7,6 +7,7 @@ import { scrapePrefixes } from "./graphScraper";
 import { Mono } from "./mono";
 import { showMessageWithTimeout } from "./showMessageWithTimeout";
 import { JJQ_URI_SCHEME } from "./jjFileSystem";
+import { showRevisionSelector } from "./showRevisionSelector";
 
 const TITLE_MAX_LENGTH = 50;
 
@@ -44,86 +45,13 @@ export async function revisionsUI(context: vscode.ExtensionContext) {
     (x) => "changeId" in x && x.changeId === workingCopyChangeId
   ) as Change & ChangePrefixes;
 
-  const itemLabelWithPrefixToRevision: { [key: string]: string } = {};
-  const itemsWithPrefixes: vscode.QuickPickItem[] = [];
-  const itemsWithoutPrefixes: vscode.QuickPickItem[] = [];
-
-  let headItem: vscode.QuickPickItem | undefined;
-
-  for (const l of itemFullData) {
-    if (l.isPrefixOnlyLine) {
-      itemsWithPrefixes.push(createQuickPickPrefixOnlyItem(l));
-    } else {
-      const qpi = createQuickPickLogItem(l, true);
-      itemsWithPrefixes.push(qpi);
-      itemLabelWithPrefixToRevision[qpi.label] = l.changeId;
-
-      const qpiWithoutPrefix = createQuickPickLogItem(l, false);
-      itemsWithoutPrefixes.push(qpiWithoutPrefix);
-
-      if (l.changeId === workingCopyChangeId) {
-        headItem = qpi;
-      }
-    }
-  }
-
-  let itemLabelToRevision = (x: string) => itemLabelWithPrefixToRevision[x];
-
-  const revisionSelector = vscode.window.createQuickPick();
-  revisionSelector.items = itemsWithPrefixes;
-  revisionSelector.title = "JJQ";
-  revisionSelector.placeholder = "Select a revision";
-  revisionSelector.matchOnDescription = true;
-  revisionSelector.matchOnDetail = true;
-  revisionSelector.activeItems = [headItem!];
-  revisionSelector.buttons = [
-    {
-      iconPath: new vscode.ThemeIcon("source-control-view-icon"),
-      tooltip: "Toggle graph diagram",
-    },
-  ];
-  let arePrefixesVisible = true;
-
-  const showGraphPrefixes = () => {
-    revisionSelector.items = itemsWithPrefixes;
-    itemLabelToRevision = (x: string) => itemLabelWithPrefixToRevision[x];
-    arePrefixesVisible = true;
-  };
-  const hideGraphPrefixes = () => {
-    revisionSelector.items = itemsWithoutPrefixes;
-    itemLabelToRevision = (x: string) => x;
-    arePrefixesVisible = false;
-  };
-  revisionSelector.onDidTriggerButton((e) => {
-    if (arePrefixesVisible) {
-      hideGraphPrefixes();
-    } else {
-      showGraphPrefixes();
-    }
-  });
-
-  const selectionPromise: Promise<vscode.QuickPickItem> = new Promise(
-    (resolve, reject) => {
-      revisionSelector.onDidChangeValue(async (e) => {
-        if (e.length === 0) {
-          showGraphPrefixes();
-        } else {
-          hideGraphPrefixes();
-        }
-      });
-      revisionSelector.onDidAccept((i) => {
-        resolve(revisionSelector.selectedItems[0]);
-        revisionSelector.hide();
-      });
-    }
+  const selection = await showRevisionSelector(
+    itemFullData,
+    workingCopyChangeId
   );
-  revisionSelector.show();
-  const selection = await selectionPromise;
-
   if (selection) {
-    const chosenRevisionId = itemLabelToRevision(selection.label);
     const chosenRevisionLog = changeNodes.find(
-      (x) => x.changeId === chosenRevisionId
+      (x) => x.changeId === selection
     )!;
 
     const actions = [
