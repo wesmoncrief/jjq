@@ -76,16 +76,39 @@ export async function revisionsUI(context: vscode.ExtensionContext) {
   revisionSelector.matchOnDescription = true;
   revisionSelector.matchOnDetail = true;
   revisionSelector.activeItems = [headItem!];
+  revisionSelector.buttons = [
+    {
+      iconPath: new vscode.ThemeIcon("source-control-view-icon"),
+      tooltip: "Toggle graph diagram",
+    },
+  ];
+  let arePrefixesVisible = true;
+
+  const showGraphPrefixes = () => {
+    revisionSelector.items = itemsWithPrefixes;
+    itemLabelToRevision = (x: string) => itemLabelWithPrefixToRevision[x];
+    arePrefixesVisible = true;
+  };
+  const hideGraphPrefixes = () => {
+    revisionSelector.items = itemsWithoutPrefixes;
+    itemLabelToRevision = (x: string) => x;
+    arePrefixesVisible = false;
+  };
+  revisionSelector.onDidTriggerButton((e) => {
+    if (arePrefixesVisible) {
+      hideGraphPrefixes();
+    } else {
+      showGraphPrefixes();
+    }
+  });
 
   const selectionPromise: Promise<vscode.QuickPickItem> = new Promise(
     (resolve, reject) => {
       revisionSelector.onDidChangeValue(async (e) => {
         if (e.length === 0) {
-          revisionSelector.items = itemsWithPrefixes;
-          itemLabelToRevision = (x: string) => itemLabelWithPrefixToRevision[x];
+          showGraphPrefixes();
         } else {
-          revisionSelector.items = itemsWithoutPrefixes;
-          itemLabelToRevision = (x: string) => x;
+          hideGraphPrefixes();
         }
       });
       revisionSelector.onDidAccept((i) => {

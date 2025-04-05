@@ -15,12 +15,18 @@ export async function scrapePrefixes(
   jj: JJ
 ): Promise<(ChangePrefixes | PrefixOnly)[]> {
   const template = `'change_id.shortest() ++ "\n\n"'`;
-  // debug query:
-  const { stdout } = await jj.exec(["log", "--template", template]);
+  const { stdout } = await jj.exec([
+    "log",
+    // "-r",
+    // '"::"',
+    "--limit", 
+    "500",
+    "--template",
+    template,
+  ]);
   const givenLines = stdout.split("\n");
   givenLines.pop();
   const prefixes = new Array<ChangePrefixes | PrefixOnly>();
-  const changeIds = new Set<string>();
 
   const doesLineHaveAChangeId = (line: string): string | null => {
     const spl = line.split(" ");
