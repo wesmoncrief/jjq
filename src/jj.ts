@@ -10,6 +10,8 @@ export interface Change {
   remoteBookmarks: string[];
   isImmutable: boolean;
   conflict: boolean;
+  author: string;
+  isMine: boolean;
 }
 
 // keep in sync with changeTemplate
@@ -21,6 +23,8 @@ interface RawChange {
   bookmarks: string;
   immutable: string;
   conflict: string;
+  author: string;
+  mine: string;
 }
 
 const inFieldSeparator1 = "_jjq_";
@@ -35,6 +39,8 @@ const changeTemplate: RawChange = {
   bookmarks: `remote_bookmarks.map(|c| c.name() ++ "${inFieldSeparator2}" ++ c.remote()).join("${inFieldSeparator1}")`,
   immutable: "immutable",
   conflict: "conflict",
+  author: "author.email().local()",
+  mine: "mine",
 };
 export const endEntry = "jjqend";
 
@@ -104,6 +110,8 @@ export class JJ {
         remoteBookmarks: remoteBookmarks,
         isImmutable: c.immutable === "true",
         conflict: c.conflict === "true",
+        author: c.author,
+        isMine: c.mine === "true",
       };
       return change;
     });

@@ -553,17 +553,22 @@ export function createQuickPickLogItem(
     ...l.localBookmarks,
     ...l.remoteBookmarks.map((b) => b + "@origin"),
   ].join(Mono.w);
+
+  const authorStr = `${l.author}`;
+  const detailLineContents = bookmarks
+    ? [authorStr, bookmarks].join(Mono.w)
+    : authorStr;
   if (includeGraphPrefixes) {
     return {
       label: l.prefix + Mono.w + l.changeId,
       description: description,
-      detail: l.lineBelow + Mono.w + Mono.w + bookmarks,
+      detail: l.lineBelow + Mono.w + Mono.w + detailLineContents,
     };
   }
   return {
     label: l.changeId,
     description: description,
-    detail: bookmarks,
+    detail: detailLineContents,
   };
 }
 
