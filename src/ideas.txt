@@ -2,6 +2,7 @@
 - support for opening pull requests
 - better interaction handling in commit picker
 - on typing a letter, clear our the graph prefixes
+- the quick file open plugin found a way to default to selecting the non-first item - use that for main view
 - short/full commit distinction
 - better sorting (it should not do fuzzy searching, but it does)
 - allow searching by commit name/bookmark

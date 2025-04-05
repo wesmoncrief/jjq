@@ -44,36 +44,61 @@ export async function revisionsUI(context: vscode.ExtensionContext) {
     (x) => "changeId" in x && x.changeId === workingCopyChangeId
   ) as Change & ChangePrefixes;
 
-  const quickPickLabelToRevision: { [key: string]: string } = {};
-  const items: vscode.QuickPickItem[] = [];
-  const workingCopyItem = createQuickPickLogItem(workingCopyLog!);
-  const workingCopyItemLabel = "===> @" + workingCopyLog!.changeId;
-  items.push({
-    ...workingCopyItem,
-    label: workingCopyItemLabel,
-    detail: undefined,
-  });
-  quickPickLabelToRevision[workingCopyItemLabel] = workingCopyLog?.changeId!;
-  items.push({ label: "", kind: vscode.QuickPickItemKind.Separator });
+  const itemLabelWithPrefixToRevision: { [key: string]: string } = {};
+  const itemsWithPrefixes: vscode.QuickPickItem[] = [];
+  const itemsWithoutPrefixes: vscode.QuickPickItem[] = [];
+
+  let headItem: vscode.QuickPickItem | undefined;
+
   for (const l of itemFullData) {
     if (l.isPrefixOnlyLine) {
-      items.push(createQuickPickPrefixOnlyItem(l));
+      itemsWithPrefixes.push(createQuickPickPrefixOnlyItem(l));
     } else {
-      const qpi = createQuickPickLogItem(l);
-      items.push(qpi);
-      quickPickLabelToRevision[qpi.label] = l.changeId;
+      const qpi = createQuickPickLogItem(l, true);
+      itemsWithPrefixes.push(qpi);
+      itemLabelWithPrefixToRevision[qpi.label] = l.changeId;
+
+      const qpiWithoutPrefix = createQuickPickLogItem(l, false);
+      itemsWithoutPrefixes.push(qpiWithoutPrefix);
+
+      if (l.changeId === workingCopyChangeId) {
+        headItem = qpi;
+      }
     }
   }
 
-  const selection = await vscode.window.showQuickPick(items, {
-    placeHolder: "Select a revision",
-    title: "JJQ",
-    matchOnDescription: true,
-    matchOnDetail: true,
-  });
+  let itemLabelToRevision = (x: string) => itemLabelWithPrefixToRevision[x];
+
+  const revisionSelector = vscode.window.createQuickPick();
+  revisionSelector.items = itemsWithPrefixes;
+  revisionSelector.title = "JJQ";
+  revisionSelector.placeholder = "Select a revision";
+  revisionSelector.matchOnDescription = true;
+  revisionSelector.matchOnDetail = true;
+  revisionSelector.activeItems = [headItem!];
+
+  const selectionPromise: Promise<vscode.QuickPickItem> = new Promise(
+    (resolve, reject) => {
+      revisionSelector.onDidChangeValue(async (e) => {
+        if (e.length === 0) {
+          revisionSelector.items = itemsWithPrefixes;
+          itemLabelToRevision = (x: string) => itemLabelWithPrefixToRevision[x];
+        } else {
+          revisionSelector.items = itemsWithoutPrefixes;
+          itemLabelToRevision = (x: string) => x;
+        }
+      });
+      revisionSelector.onDidAccept((i) => {
+        resolve(revisionSelector.selectedItems[0]);
+        revisionSelector.hide();
+      });
+    }
+  );
+  revisionSelector.show();
+  const selection = await selectionPromise;
 
   if (selection) {
-    const chosenRevisionId = quickPickLabelToRevision[selection.label];
+    const chosenRevisionId = itemLabelToRevision(selection.label);
     const chosenRevisionLog = changeNodes.find(
       (x) => x.changeId === chosenRevisionId
     )!;
@@ -497,17 +522,25 @@ export function createQuickPickPrefixOnlyItem(
 }
 
 export function createQuickPickLogItem(
-  l: Change & ChangePrefixes
+  l: Change & ChangePrefixes,
+  includeGraphPrefixes: boolean
 ): vscode.QuickPickItem {
   const description = generateFriendlyNames(l, 100).description;
   const bookmarks = [
     ...l.localBookmarks,
     ...l.remoteBookmarks.map((b) => b + "@origin"),
   ].join(Mono.w);
+  if (includeGraphPrefixes) {
+    return {
+      label: l.prefix + Mono.w + l.changeId,
+      description: description,
+      detail: l.lineBelow + Mono.w + Mono.w + bookmarks,
+    };
+  }
   return {
-    label: l.prefix + Mono.w + l.changeId,
+    label: l.changeId,
     description: description,
-    detail: l.lineBelow + Mono.w + Mono.w + bookmarks,
+    detail: bookmarks,
   };
 }
 
