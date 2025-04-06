@@ -1,5 +1,6 @@
 import ChildProcess from "child_process";
 import { promisify } from "util";
+import { log } from "./logger";
 
 export interface Change {
   changeId: string;
@@ -207,5 +208,6 @@ export interface ExecResult {
 export const exec = promisify(ChildProcess.exec);
 const execArgs = (args: string[], cwd: string): Promise<ExecResult> => {
   const cmd = args.join(" ");
+  log("Running command: " + cmd);
   return exec("jj " + cmd, { cwd });
 };

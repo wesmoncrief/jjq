@@ -71,7 +71,7 @@ function toMono(s: string): string {
     const char = s[i];
     const monoChar = MONO_MAP[char];
     if (monoChar === undefined) {
-      console.error("missing mono char:", char);
+      console.log("missing mono char:", char);
     }
     mono += monoChar ?? char;
   }

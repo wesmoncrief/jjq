@@ -1,7 +1,6 @@
 - to publish
     - readme
     - something for windows?
-    - write logs to the extension log destination
 - short/full commit distinction
 - support 'diverges from remote' type bookmark conflict?
 - look at what whichKey has done - https://github.com/VSpaceCode/vscode-which-key/blob/master/src/menu/baseWhichKeyMenu.ts#L36

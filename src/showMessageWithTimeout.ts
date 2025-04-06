@@ -1,15 +1,5 @@
 import * as vscode from "vscode";
 
-/**
- * Shows a message that auto closes after a certain timeout. Since there's no API for this functionality the
- * progress output is used instead, which auto closes at 100%.
- * This means the function cannot (and should not) be used for warnings or errors. These types of message require
- * the user to really take note.
- *
- * @param message The message to show.
- * @param timeout The time in milliseconds after which the message should close (default 3secs).
- */
-
 export const showMessageWithTimeout = (
   message: string,
   timeout = 3500

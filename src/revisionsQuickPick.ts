@@ -37,10 +37,16 @@ export async function showRevisionsQuickPick(
 
   const revisionSelector = vscode.window.createQuickPick();
   revisionSelector.items = itemsWithPrefixes;
-  revisionSelector.title = "JJQ";
+  revisionSelector.title = "jjq";
   revisionSelector.placeholder = "Select a revision";
   revisionSelector.matchOnDescription = true;
   revisionSelector.matchOnDetail = true;
+  revisionSelector.buttons = [
+    {
+      iconPath: new vscode.ThemeIcon("source-control"),
+      tooltip: "Toggle graph",
+    },
+  ];
 
   let arePrefixesVisible = true;
 
@@ -61,16 +67,16 @@ export async function showRevisionsQuickPick(
       showGraphPrefixes();
     }
   });
+  revisionSelector.onDidChangeValue(async (e) => {
+    if (e.length === 0) {
+      showGraphPrefixes();
+    } else {
+      hideGraphPrefixes();
+    }
+  });
 
   const selectionPromise: Promise<vscode.QuickPickItem> = new Promise(
     (resolve, reject) => {
-      revisionSelector.onDidChangeValue(async (e) => {
-        if (e.length === 0) {
-          showGraphPrefixes();
-        } else {
-          hideGraphPrefixes();
-        }
-      });
       revisionSelector.onDidAccept((i) => {
         resolve(revisionSelector.selectedItems[0]);
         revisionSelector.hide();
