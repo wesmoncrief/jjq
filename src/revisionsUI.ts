@@ -7,7 +7,7 @@ import { scrapePrefixes } from "./graphScraper";
 import { Mono } from "./mono";
 import { showMessageWithTimeout } from "./showMessageWithTimeout";
 import { JJQ_URI_SCHEME } from "./jjFileSystem";
-import { showRevisionSelector } from "./showRevisionSelector";
+import { showRevisionsQuickPick } from "./revisionsQuickPick";
 
 const TITLE_MAX_LENGTH = 50;
 
@@ -45,7 +45,7 @@ export async function revisionsUI(context: vscode.ExtensionContext) {
     (x) => "changeId" in x && x.changeId === workingCopyChangeId
   ) as Change & ChangePrefixes;
 
-  const selection = await showRevisionSelector(
+  const selection = await showRevisionsQuickPick(
     itemFullData,
     workingCopyChangeId
   );
@@ -80,13 +80,13 @@ export async function revisionsUI(context: vscode.ExtensionContext) {
       title: actionSelectTitle.changeIdAndDescription,
     });
     if (action) {
-      const completedScreens = await handleRevisionAction(
+      const shouldShowRevisionsUIAgain = await handleRevisionAction(
         action.label,
         jj,
         chosenRevisionLog,
         workingCopyLog
       );
-      if (completedScreens) {
+      if (shouldShowRevisionsUIAgain) {
         return revisionsUI(context);
       }
     }
@@ -372,10 +372,6 @@ export async function handleRevisionAction(
     }
     case "d": {
       return await handleDescribe(chosenRevision, jj);
-    }
-    case "show": {
-      // opens code window with extra details
-      throw new Error("nyi");
     }
   }
   throw new Error("nyi: " + action);

@@ -24,10 +24,6 @@ export async function getRepositoryRoot(
   if (!input) {
     return null;
   }
-  if (!input.startsWith("/")) {
-    // todo windows / use APIs for paths
-    throw new Error("Must be an absolute path - must start with `/`");
-  }
   context.workspaceState.update(REPO_KEY, input);
   return input;
 }

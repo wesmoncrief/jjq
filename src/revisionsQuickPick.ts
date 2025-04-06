@@ -6,7 +6,7 @@ import {
   createQuickPickLogItem,
 } from "./revisionsUI";
 
-export async function showRevisionSelector(
+export async function showRevisionsQuickPick(
   allRevisions: ((Change & ChangePrefixes) | PrefixOnly)[],
   workingCopyChangeId: string
 ): Promise<string | undefined> {

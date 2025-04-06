@@ -5,7 +5,7 @@ import { JJ } from "./jj";
 import { Mono } from "./mono";
 import { clearRepositoryRoot, getRepositoryRoot } from "./repositoryFinder";
 import { JJFileSystemProvider, JJQ_URI_SCHEME } from "./jjFileSystem";
-import { generateFriendlyNames, revisionsUI } from "./showRevisions";
+import { generateFriendlyNames, revisionsUI } from "./revisionsUI";
 
 let _extensionContext: vscode.ExtensionContext;
 

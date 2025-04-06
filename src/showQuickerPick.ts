@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 
-
-export function showQuickerPick(
+export async function showQuickerPick(
   items: vscode.QuickPickItem[],
   opts?: {
     placeholder?: string;
@@ -23,9 +22,15 @@ export function showQuickerPick(
         resolve(qp.selectedItems[0]);
         qp.hide();
       });
-      // todo handle reject to stop mem leak?
+      qp.onDidHide(() => {
+        reject();
+      });
     }
   );
   qp.show();
-  return result;
+  try {
+    return await result;
+  } catch (e) {
+    return undefined;
+  }
 }

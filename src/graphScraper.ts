@@ -3,9 +3,6 @@ import { JJ } from "./jj";
 import { MONO_MAP } from "./mono";
 
 const alphabet = "abcdefghijklmnopqrstuvwxyz";
-if (alphabet.length !== 26) {
-  throw new Error("oop");
-}
 const alphabetSet = new Set();
 for (let i = 0; i < 26; ++i) {
   alphabetSet.add(alphabet[i]);
@@ -17,8 +14,6 @@ export async function scrapePrefixes(
   const template = `'change_id.shortest() ++ "\n\n"'`;
   const { stdout } = await jj.exec([
     "log",
-    // "-r",
-    // '"::"',
     "--limit", 
     "500",
     "--template",
