@@ -41,6 +41,7 @@ export async function showRevisionsQuickPick(
   revisionSelector.placeholder = "Select a revision";
   revisionSelector.matchOnDescription = true;
   revisionSelector.matchOnDetail = true;
+  revisionSelector.activeItems = headItem ? [headItem] : [];
   revisionSelector.buttons = [
     {
       iconPath: new vscode.ThemeIcon("source-control"),
