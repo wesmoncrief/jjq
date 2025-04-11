@@ -2,7 +2,7 @@
   "name": "jjq",
   "displayName": "jjq",
   "description": "Quick JJ interface",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "engines": {
     "vscode": "^1.98.0"
   },
@@ -12,6 +12,8 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "repository": "https://github.com/wesmoncrief/jjq",
+  "license": "MIT",
   "main": "./dist/extension.js",
   "publisher": "wes",
   "contributes": {

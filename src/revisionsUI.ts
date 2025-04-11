@@ -336,7 +336,7 @@ export async function handleRevisionAction(
     case "r": {
       const input = await vscode.window.showInputBox({
         title: "rebase",
-        value: `-b ${chosenRevision.changeId} -d master@origin`,
+        value: `-s ${chosenRevision.changeId} -d master@origin`,
       });
       if (input === undefined) {
         return false;

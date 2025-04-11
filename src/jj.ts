@@ -151,6 +151,7 @@ export class JJ {
     bookmarks.pop();
     return Array.from(new Set(bookmarks));
   }
+
   async setBookmark(r: string, bookmark: string): Promise<ExecResult> {
     return await execArgs(
       ["bookmark", "set", `"${bookmark}"`, "-r", r, "--allow-backwards"],

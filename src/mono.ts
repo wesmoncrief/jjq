@@ -1,3 +1,4 @@
+// This works for the SF font on my macbook
 export const Mono = {
   hair: " ",
   w: `               `, // hair spaces

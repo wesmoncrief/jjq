@@ -33,6 +33,7 @@ export async function scrapePrefixes(
     }
     return lastSplit;
   };
+
   for (let i = 0; i < givenLines.length; ++i) {
     const line = givenLines[i];
 
