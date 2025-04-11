@@ -15,7 +15,7 @@
   "repository": "https://github.com/wesmoncrief/jjq",
   "license": "MIT",
   "main": "./dist/extension.js",
-  "publisher": "wes",
+  "publisher": "wesmoncrief",
   "contributes": {
     "commands": [
       {
