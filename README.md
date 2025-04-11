@@ -2,7 +2,7 @@
 
 jjq is a VSCode extension that provides a UI to interact with the jj ([jujutsu](https://github.com/jj-vcs/jj)) VCS through a quickpick dialogue. It is meant to quickly support common operations.
 
-jjq_demo.mov
+https://github.com/user-attachments/assets/50b6cce8-0b19-433f-9315-d06eb739e612
 
 
 # Current Limitations
