@@ -4,6 +4,7 @@ import { Mono } from "./mono";
 import { clearRepositoryRoot, getRepositoryRoot } from "./repositoryFinder";
 import { JJFileSystemProvider, JJQ_URI_SCHEME } from "./jjFileSystem";
 import { generateFriendlyNames, revisionsUI } from "./revisionsUI";
+import { log } from "./logger";
 
 let _extensionContext: vscode.ExtensionContext;
 
@@ -13,7 +14,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const items = Object.values(Mono).map((c) => {
       return {
         label: c.repeat(10) + " x",
-        detail: " "
+        detail: " ",
       };
     });
     await vscode.window.showQuickPick(items);
@@ -25,7 +26,7 @@ export async function activate(context: vscode.ExtensionContext) {
     "jjq.setRepository",
     async () => {
       await clearRepositoryRoot(context);
-      await getRepositoryRoot(context);
+      await getRepositoryRoot(context, { shouldAskIfNotKnown: true });
     }
   );
   context.subscriptions.push(setRepository);
@@ -64,9 +65,11 @@ async function setStatusBar(
   context: vscode.ExtensionContext,
   statusBar: vscode.StatusBarItem
 ) {
-  const repoRoot = await getRepositoryRoot(context);
+  const repoRoot = await getRepositoryRoot(context, {
+    shouldAskIfNotKnown: false,
+  });
   if (!repoRoot) {
-    vscode.window.showErrorMessage("Could not load repository root location");
+    log("Could not load repository root location");
     return;
   }
   const jj = new JJ(repoRoot);

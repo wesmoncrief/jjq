@@ -17,7 +17,9 @@ export class JJFileSystemProvider
       const filePath = uri.fsPath;
       const revisionId = uri.query;
 
-      const repoRoot = await getRepositoryRoot(this.extensionContext);
+      const repoRoot = await getRepositoryRoot(this.extensionContext, {
+        shouldAskIfNotKnown: false,
+      });
       if (!repoRoot) {
         throw new Error("Repository root not found");
       }

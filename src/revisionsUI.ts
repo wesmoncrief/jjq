@@ -12,7 +12,7 @@ import { showRevisionsQuickPick } from "./revisionsQuickPick";
 const TITLE_MAX_LENGTH = 50;
 
 export async function revisionsUI(context: vscode.ExtensionContext) {
-  const repoRoot = await getRepositoryRoot(context);
+  const repoRoot = await getRepositoryRoot(context, { shouldAskIfNotKnown: true});
   if (!repoRoot) {
     vscode.window.showErrorMessage("Could not load repository root location");
     return;
