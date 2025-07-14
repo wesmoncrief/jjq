@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { showQuickerPick } from "./showQuickerPick";
 import { ChangePrefixes, PrefixOnly } from "./graph";
-import { JJ, Change, exec } from "./jj";
+import { JJ, Change, exec, findExecutable } from "./jj";
 import { getRepositoryRoot } from "./repositoryFinder";
 import { scrapePrefixes } from "./graphScraper";
 import { Mono } from "./mono";
@@ -245,8 +245,9 @@ async function handleBookmarkRevisionAction(
       }
       await jj.setBookmark(chosenRevisionLog.changeId, branch);
       await jj.pushBookmark(branch);
+      const gh = findExecutable('gh');
       await exec(
-        `cd ${jj.rootLocation} && gh pr create --web --title "${chosenRevisionLog.changeMessage}" --head ${branch}`
+        `cd ${jj.rootLocation} && ${gh} pr create --web --title "${chosenRevisionLog.changeMessage}" --head ${branch}`
       );
       return true;
     }

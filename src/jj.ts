@@ -209,36 +209,32 @@ export interface ExecResult {
 
 export const exec = promisify(ChildProcess.exec);
 
-let jjExecutableLocation: string | null = null;
-function findJJExecutable(): string {
-  if (jjExecutableLocation) {
-    return jjExecutableLocation;
-  }
+// Cache for executable locations
+const executableCache = new Map<string, string>();
 
-  // First, try environment variable
-  if (process.env.JJ_PATH) {
-    jjExecutableLocation = process.env.JJ_PATH;
-    return process.env.JJ_PATH;
+export function findExecutable(executableName: string): string {
+  if (executableCache.has(executableName)) {
+    return executableCache.get(executableName)!;
   }
 
   // Common installation paths
   const commonPaths = [
-    "/opt/homebrew/bin/jj",  // Homebrew on Apple Silicon
-    "/usr/local/bin/jj",     // Homebrew on Intel Mac
-    "/usr/bin/jj",           // System installation
-    "jj"                     // Fallback to PATH
+    `/opt/homebrew/bin/${executableName}`, // Homebrew on Apple Silicon
+    `/usr/local/bin/${executableName}`, // Homebrew on Intel Mac
+    `/usr/bin/${executableName}`, // System installation
+    executableName, // Fallback to PATH
   ];
 
   for (const path of commonPaths) {
     try {
-      if (path === "jj") {
+      if (path === executableName) {
         // For the PATH fallback, we'll just return it and let exec handle the error
-        jjExecutableLocation = path;
+        executableCache.set(executableName, path);
         return path;
       }
       if (fs.existsSync(path)) {
-        log(`Found jj at: ${path}`);
-        jjExecutableLocation = path;
+        log(`Found ${executableName} at: ${path}`);
+        executableCache.set(executableName, path);
         return path;
       }
     } catch (error) {
@@ -246,13 +242,14 @@ function findJJExecutable(): string {
     }
   }
 
-  log("Could not find jj executable, falling back to PATH");
-  return "jj";
+  log(`Could not find ${executableName} executable, falling back to PATH`);
+  executableCache.set(executableName, executableName);
+  return executableName;
 }
 
 const execArgs = (args: string[], cwd: string): Promise<ExecResult> => {
   const cmd = args.join(" ");
   log("Running command: " + cmd);
-  const jjCommand = findJJExecutable();
+  const jjCommand = findExecutable("jj");
   return exec(jjCommand + " " + cmd, { cwd });
 };
