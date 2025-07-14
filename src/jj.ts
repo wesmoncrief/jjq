@@ -1,6 +1,7 @@
 import ChildProcess from "child_process";
 import { promisify } from "util";
 import { log } from "./logger";
+import * as fs from "fs";
 
 export interface Change {
   changeId: string;
@@ -207,8 +208,51 @@ export interface ExecResult {
 }
 
 export const exec = promisify(ChildProcess.exec);
+
+let jjExecutableLocation: string | null = null;
+function findJJExecutable(): string {
+  if (jjExecutableLocation) {
+    return jjExecutableLocation;
+  }
+
+  // First, try environment variable
+  if (process.env.JJ_PATH) {
+    jjExecutableLocation = process.env.JJ_PATH;
+    return process.env.JJ_PATH;
+  }
+
+  // Common installation paths
+  const commonPaths = [
+    "/opt/homebrew/bin/jj",  // Homebrew on Apple Silicon
+    "/usr/local/bin/jj",     // Homebrew on Intel Mac
+    "/usr/bin/jj",           // System installation
+    "jj"                     // Fallback to PATH
+  ];
+
+  for (const path of commonPaths) {
+    try {
+      if (path === "jj") {
+        // For the PATH fallback, we'll just return it and let exec handle the error
+        jjExecutableLocation = path;
+        return path;
+      }
+      if (fs.existsSync(path)) {
+        log(`Found jj at: ${path}`);
+        jjExecutableLocation = path;
+        return path;
+      }
+    } catch (error) {
+      // Continue to next path
+    }
+  }
+
+  log("Could not find jj executable, falling back to PATH");
+  return "jj";
+}
+
 const execArgs = (args: string[], cwd: string): Promise<ExecResult> => {
   const cmd = args.join(" ");
   log("Running command: " + cmd);
-  return exec("jj " + cmd, { cwd });
+  const jjCommand = findJJExecutable();
+  return exec(jjCommand + " " + cmd, { cwd });
 };
