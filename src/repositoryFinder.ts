@@ -15,7 +15,7 @@ export async function getRepositoryRoot(
     shouldAskIfNotKnown: boolean;
   }
 ): Promise<string | null> {
-  const repo_cwd = context.workspaceState.get(REPO_KEY);
+  const repo_cwd = context.workspaceState.get(REPO_KEY) ?? vscode.workspace.getConfiguration("jjq").get<string>("repositoryPath");
   if (repo_cwd) {
     return repo_cwd as string;
   }
